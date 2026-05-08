@@ -331,6 +331,7 @@ function App() {
   const [applicationStatusFilter, setApplicationStatusFilter] = useState('ALL');
   const [savingApplicationEdit, setSavingApplicationEdit] = useState(false);
   const [cancellingApplication, setCancellingApplication] = useState(false);
+  const [creatingApplication, setCreatingApplication] = useState(false);
   const [uploadingDocuments, setUploadingDocuments] = useState(false);
   const [updatingApplicationId, setUpdatingApplicationId] = useState('');
   const [departmentErrors, setDepartmentErrors] = useState(emptyDepartmentErrors);
@@ -724,6 +725,7 @@ function App() {
     setSelectedDepartmentId('');
     setSavingApplicationEdit(false);
     setCancellingApplication(false);
+    setCreatingApplication(false);
     setUploadingDocuments(false);
     setApplicationSearchQuery('');
     setApplicationSortMode('newest');
@@ -845,6 +847,9 @@ function App() {
     if (!auth) return;
     setError('');
     setMessage('');
+    if (creatingApplication) {
+      return;
+    }
 
     if (!validateApplicationPoints(applicationForm, setApplicationFormErrors)) {
       return;
@@ -869,6 +874,7 @@ function App() {
       return;
     }
 
+    setCreatingApplication(true);
     try {
       const created = await api.applicantCreateApplication(auth.token, {
         ...applicationForm,
@@ -899,6 +905,8 @@ function App() {
       setActiveSection('application-details');
     } catch (nextError) {
       setError(nextError.message);
+    } finally {
+      setCreatingApplication(false);
     }
   }
 
@@ -1492,6 +1500,7 @@ function App() {
               setError,
               applicationCreateDocumentGroups,
               setApplicationCreateDocumentGroups,
+              creatingApplication,
               publicDepartments,
               publicSpecialities,
               applicantUsedSpecialityIds,
@@ -2444,6 +2453,7 @@ function ApplicantApplicationCreateSection({
   setError,
   applicationCreateDocumentGroups,
   setApplicationCreateDocumentGroups,
+  creatingApplication,
   availableSpecialitiesForCreate,
   handleCreateApplication,
 }) {
@@ -2566,21 +2576,48 @@ function ApplicantApplicationCreateSection({
                             />
                           </Button>
 
-                          <Typography variant="body2" color="text.secondary">
-                            {group.files.length
-                              ? `Выбрано файлов: ${group.files.length}`
-                              : `Можно выбрать до ${MAX_UPLOAD_FILES_PER_BATCH} файлов для одного типа. Каждый файл до ${MAX_UPLOAD_SIZE_LABEL}.`}
-                          </Typography>
-
                           {group.files.length ? (
-                            <Stack spacing={0.5}>
+                            <Stack spacing={1}>
                               {group.files.map((file) => (
-                                <Typography key={`${group.id}-${file.name}-${file.size}`} variant="body2">
-                                  {file.name}
-                                </Typography>
+                                <Card key={`${group.id}-${file.name}-${file.size}`} variant="outlined" sx={{ borderRadius: 2 }}>
+                                  <CardContent sx={{ py: 1.25, px: 1.75, '&:last-child': { pb: 1.25 } }}>
+                                    <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+                                      <Box sx={{ minWidth: 0 }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, wordBreak: 'break-word' }}>
+                                          {file.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {formatBytes(file.size)}
+                                        </Typography>
+                                      </Box>
+                                      <Button
+                                        size="small"
+                                        color="error"
+                                        variant="text"
+                                        startIcon={<DeleteOutline />}
+                                        onClick={() => {
+                                          setError('');
+                                          setApplicationCreateDocumentGroups((current) =>
+                                            current.map((item) =>
+                                              item.id === group.id
+                                                ? { ...item, files: item.files.filter((_, fileIndex) => fileIndex !== index) }
+                                                : item,
+                                            ),
+                                          );
+                                        }}
+                                      >
+                                        Удалить
+                                      </Button>
+                                    </Stack>
+                                  </CardContent>
+                                </Card>
                               ))}
                             </Stack>
-                          ) : null}
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              Можно выбрать до {MAX_UPLOAD_FILES_PER_BATCH} файлов для одного типа. Каждый файл до {MAX_UPLOAD_SIZE_LABEL}.
+                            </Typography>
+                          )}
                         </Stack>
                       </CardContent>
                     </Card>
@@ -2676,9 +2713,9 @@ function ApplicantApplicationCreateSection({
             variant="contained"
             startIcon={<CloudUpload />}
             sx={{ alignSelf: 'flex-start' }}
-            disabled={!availableSpecialitiesForCreate.length}
+            disabled={!availableSpecialitiesForCreate.length || creatingApplication}
           >
-            Отправить заявку
+            {creatingApplication ? 'Отправка...' : 'Отправить заявку'}
           </Button>
         </Stack>
       </CardContent>
