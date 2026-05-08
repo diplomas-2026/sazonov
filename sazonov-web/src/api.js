@@ -75,6 +75,10 @@ export const api = {
   applicantCreateApplication: (token, payload) =>
     request('/applicant/applications', { token, method: 'POST', body: payload }),
   applicantApplication: (token, id) => request(`/applicant/applications/${id}`, { token }),
+  applicantUpdateApplication: (token, id, payload) =>
+    request(`/applicant/applications/${id}`, { token, method: 'PUT', body: payload }),
+  applicantCancelApplication: (token, id) =>
+    request(`/applicant/applications/${id}/cancel`, { token, method: 'POST' }),
   applicationChatMessages: (token, applicationId) => request(`/chat/applications/${applicationId}/messages`, { token }),
   applicationChatLastMessage: (token, applicationId) =>
     request(`/chat/applications/${applicationId}/messages/last`, { token }),

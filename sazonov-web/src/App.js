@@ -30,6 +30,7 @@ import {
   AssignmentTurnedIn,
   Dashboard,
   CloudUpload,
+  Block,
   DeleteOutline,
   Download,
   Edit,
@@ -52,6 +53,7 @@ const STATUS_LABELS = {
   MISSING_DOCS: 'Нужны документы',
   ACCEPTED: 'Одобрена',
   REJECTED: 'Отклонена',
+  CANCELLED: 'Отменена',
 };
 
 const ROLE_LABELS = {
@@ -68,6 +70,15 @@ const DOCUMENT_TYPES = [
   { value: 'SNILS', label: 'СНИЛС' },
   { value: 'OTHER', label: 'Другой документ' },
 ];
+
+const DOCUMENT_TYPE_LABELS = {
+  PASSPORT: 'Паспорт',
+  EDUCATION_CERTIFICATE: 'Аттестат',
+  PHOTO: 'Фотография',
+  MEDICAL_CERTIFICATE: 'Медицинская справка',
+  SNILS: 'СНИЛС',
+  OTHER: 'Другой документ',
+};
 
 const STATUS_OPTIONS = [
   { value: 'ALL', label: 'Все заявки' },
@@ -103,6 +114,10 @@ const emptyApplication = {
   graduationYear: new Date().getFullYear(),
   points: 0,
   applicantComment: '',
+};
+
+const emptyApplicationEdit = {
+  ...emptyApplication,
 };
 
 const emptyDepartment = {
@@ -142,6 +157,7 @@ function App() {
   const [registerForm, setRegisterForm] = useState(emptyRegister);
   const [profileForm, setProfileForm] = useState(emptyProfile);
   const [applicationForm, setApplicationForm] = useState(emptyApplication);
+  const [applicationEditForm, setApplicationEditForm] = useState(emptyApplicationEdit);
   const [applicationCreateDocuments, setApplicationCreateDocuments] = useState([]);
   const [applicationCreateDocumentType, setApplicationCreateDocumentType] = useState('PASSPORT');
   const [departmentForm, setDepartmentForm] = useState(emptyDepartment);
@@ -170,6 +186,8 @@ function App() {
   const [creatingDepartment, setCreatingDepartment] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
   const [activeSection, setActiveSection] = useState('');
+  const [savingApplicationEdit, setSavingApplicationEdit] = useState(false);
+  const [cancellingApplication, setCancellingApplication] = useState(false);
 
   const loadPublic = useCallback(async () => {
     try {
@@ -373,6 +391,33 @@ function App() {
     [applicantApplications, selectedApplicantApplicationId],
   );
 
+  const selectedApplicantApplicationCanEdit = useMemo(
+    () =>
+      Boolean(
+        selectedApplicantApplication &&
+          !['ACCEPTED', 'REJECTED', 'CANCELLED'].includes(selectedApplicantApplication.status),
+      ),
+    [selectedApplicantApplication],
+  );
+
+  useEffect(() => {
+    if (selectedApplicantApplication) {
+      setApplicationEditForm({
+        specialityId: `${selectedApplicantApplication.speciality?.id || ''}`,
+        passportSeries: selectedApplicantApplication.passportSeries || '',
+        passportNumber: selectedApplicantApplication.passportNumber || '',
+        snils: selectedApplicantApplication.snils || '',
+        educationDocumentNumber: selectedApplicantApplication.educationDocumentNumber || '',
+        graduationSchool: selectedApplicantApplication.graduationSchool || '',
+        graduationYear: selectedApplicantApplication.graduationYear || new Date().getFullYear(),
+        points: selectedApplicantApplication.points ?? 0,
+        applicantComment: selectedApplicantApplication.applicantComment || '',
+      });
+    } else {
+      setApplicationEditForm(emptyApplicationEdit);
+    }
+  }, [selectedApplicantApplication]);
+
   const selectedStaffApplication = useMemo(
     () => staffApplications.find((item) => `${item.id}` === `${selectedStaffApplicationId}`) || null,
     [staffApplications, selectedStaffApplicationId],
@@ -496,12 +541,15 @@ function App() {
     setPublicLeaderboard([]);
     setApplicationCreateDocuments([]);
     setApplicationCreateDocumentType('PASSPORT');
+    setApplicationEditForm(emptyApplicationEdit);
     setSelectedApplicantApplicationId('');
     setSelectedStaffApplicationId('');
     setSelectedLeaderboardSpecialityId('');
     setSelectedSpecialityId('');
     setSelectedUserId('');
     setSelectedDepartmentId('');
+    setSavingApplicationEdit(false);
+    setCancellingApplication(false);
     setMessage('Сеанс завершён');
     await loadPublic();
   }
@@ -551,9 +599,61 @@ function App() {
       const applications = await api.applicantApplications(auth.token);
       setApplicantApplications(applications);
       setSelectedApplicantApplicationId(`${created.id}`);
-      setActiveSection('applications');
+      setActiveSection('application-details');
     } catch (nextError) {
       setError(nextError.message);
+    }
+  }
+
+  async function handleUpdateApplication(event) {
+    event.preventDefault();
+    if (!auth || !selectedApplicantApplication) return;
+
+    setError('');
+    setMessage('');
+    setSavingApplicationEdit(true);
+
+    try {
+      const updated = await api.applicantUpdateApplication(auth.token, selectedApplicantApplication.id, {
+        ...applicationEditForm,
+        specialityId: Number(applicationEditForm.specialityId),
+        graduationYear: Number(applicationEditForm.graduationYear),
+        points: Number(applicationEditForm.points),
+      });
+
+      const applications = await api.applicantApplications(auth.token);
+      setApplicantApplications(applications);
+      setSelectedApplicantApplicationId(`${updated.id}`);
+      setMessage(`Заявка №${updated.id} обновлена`);
+      setActiveSection('application-details');
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setSavingApplicationEdit(false);
+    }
+  }
+
+  async function handleCancelApplication() {
+    if (!auth || !selectedApplicantApplication) return;
+    if (!window.confirm(`Отменить заявку №${selectedApplicantApplication.id}?`)) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setCancellingApplication(true);
+
+    try {
+      const cancelled = await api.applicantCancelApplication(auth.token, selectedApplicantApplication.id);
+      const applications = await api.applicantApplications(auth.token);
+      setApplicantApplications(applications);
+      setSelectedApplicantApplicationId(`${cancelled.id}`);
+      setMessage(`Заявка №${cancelled.id} отменена`);
+      setActiveSection('application-details');
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setCancellingApplication(false);
     }
   }
 
@@ -1175,14 +1275,21 @@ function App() {
               publicLeaderboard,
               applicantApplications,
               selectedApplicantApplication,
+              selectedApplicantApplicationCanEdit,
               setSelectedApplicantApplicationId,
               selectedLeaderboardSpecialityId,
               setSelectedLeaderboardSpecialityId,
               setActiveSection,
               handleCreateApplication,
+              handleUpdateApplication,
+              handleCancelApplication,
               handleUploadDocument,
               handleDeleteDocument,
               handleDownloadDocument,
+              applicationEditForm,
+              setApplicationEditForm,
+              savingApplicationEdit,
+              cancellingApplication,
               documentTypes: DOCUMENT_TYPES,
               staffFilter,
               setStaffFilter: handleStaffFilterChange,
@@ -1389,11 +1496,19 @@ function ApplicantApplicationsSection({
 function ApplicantApplicationDetailsSection({
   auth,
   selectedApplicantApplication,
+  selectedApplicantApplicationCanEdit,
   setActiveSection,
+  publicSpecialities,
+  applicationEditForm,
+  setApplicationEditForm,
+  handleUpdateApplication,
+  handleCancelApplication,
   handleDownloadDocument,
   handleDeleteDocument,
   handleUploadDocument,
   documentTypes,
+  savingApplicationEdit,
+  cancellingApplication,
 }) {
   return (
     <Stack spacing={2.5}>
@@ -1435,6 +1550,144 @@ function ApplicantApplicationDetailsSection({
                         <InfoTile label="Комментарий сотрудника" value={selectedApplicantApplication.staffComment || 'Пока нет замечаний'} />
                       </Grid>
                     </Stack>
+                  </CardContent>
+                </Card>
+
+                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                  <CardContent>
+                    <SectionHeader
+                      title="Редактирование заявки"
+                      text="Можно изменить данные заявки до её окончательного рассмотрения."
+                    />
+
+                    {selectedApplicantApplicationCanEdit ? (
+                      <Stack component="form" spacing={2} onSubmit={handleUpdateApplication}>
+                        <TextField
+                          select
+                          label="Специальность"
+                          value={applicationEditForm.specialityId}
+                          onChange={(event) =>
+                            setApplicationEditForm({ ...applicationEditForm, specialityId: event.target.value })
+                          }
+                          fullWidth
+                        >
+                          <MenuItem value="">Выберите специальность</MenuItem>
+                          {publicSpecialities.map((speciality) => (
+                            <MenuItem key={speciality.id} value={speciality.id}>
+                              {speciality.department?.name || 'Без отделения'} · {speciality.code} · {speciality.name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Серия паспорта"
+                              value={applicationEditForm.passportSeries}
+                              onChange={(event) =>
+                                setApplicationEditForm({ ...applicationEditForm, passportSeries: event.target.value })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Номер паспорта"
+                              value={applicationEditForm.passportNumber}
+                              onChange={(event) =>
+                                setApplicationEditForm({ ...applicationEditForm, passportNumber: event.target.value })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="СНИЛС"
+                              value={applicationEditForm.snils}
+                              onChange={(event) => setApplicationEditForm({ ...applicationEditForm, snils: event.target.value })}
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Номер аттестата"
+                              value={applicationEditForm.educationDocumentNumber}
+                              onChange={(event) =>
+                                setApplicationEditForm({
+                                  ...applicationEditForm,
+                                  educationDocumentNumber: event.target.value,
+                                })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField
+                              label="Школа / колледж"
+                              value={applicationEditForm.graduationSchool}
+                              onChange={(event) =>
+                                setApplicationEditForm({ ...applicationEditForm, graduationSchool: event.target.value })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Год окончания"
+                              type="number"
+                              value={applicationEditForm.graduationYear}
+                              onChange={(event) =>
+                                setApplicationEditForm({ ...applicationEditForm, graduationYear: event.target.value })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Средний балл в аттестате"
+                              type="number"
+                              value={applicationEditForm.points}
+                              onChange={(event) =>
+                                setApplicationEditForm({ ...applicationEditForm, points: event.target.value })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField
+                              label="Комментарий"
+                              value={applicationEditForm.applicantComment}
+                              onChange={(event) =>
+                                setApplicationEditForm({ ...applicationEditForm, applicantComment: event.target.value })
+                              }
+                              multiline
+                              minRows={3}
+                              fullWidth
+                            />
+                          </Grid>
+                        </Grid>
+
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                          <Button type="submit" variant="contained" startIcon={<Edit />} disabled={savingApplicationEdit}>
+                            {savingApplicationEdit ? 'Сохранение...' : 'Сохранить изменения'}
+                          </Button>
+                          <Button
+                            type="button"
+                            color="error"
+                            variant="outlined"
+                            startIcon={<Block />}
+                            onClick={handleCancelApplication}
+                            disabled={cancellingApplication}
+                          >
+                            {cancellingApplication ? 'Отмена...' : 'Отменить заявку'}
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    ) : (
+                      <Alert severity="info" variant="outlined">
+                        Эту заявку уже нельзя редактировать. Изменение данных доступно только до финального решения.
+                      </Alert>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -2673,6 +2926,7 @@ function StatusChip({ status }) {
     MISSING_DOCS: { label: STATUS_LABELS.MISSING_DOCS, bg: alpha('#ea4335', 0.10), color: '#b3261e' },
     ACCEPTED: { label: STATUS_LABELS.ACCEPTED, bg: alpha('#34a853', 0.12), color: '#137333' },
     REJECTED: { label: STATUS_LABELS.REJECTED, bg: alpha('#ea4335', 0.10), color: '#b3261e' },
+    CANCELLED: { label: STATUS_LABELS.CANCELLED, bg: alpha('#5f6368', 0.12), color: '#3c4043' },
   };
   const current = chipStyles[status] || { label: status, bg: alpha('#5f6368', 0.10), color: '#3c4043' };
 
@@ -2730,7 +2984,7 @@ function DocumentRow({ document, onDownload, onDelete, compact = false }) {
               {document.fileName}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {document.type} · {formatBytes(document.size)}
+              {DOCUMENT_TYPE_LABELS[document.type] || document.type} · {formatBytes(document.size)}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap">

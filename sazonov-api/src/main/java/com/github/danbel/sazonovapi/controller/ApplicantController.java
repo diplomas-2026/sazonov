@@ -5,6 +5,7 @@ import com.github.danbel.sazonovapi.domain.ApplicationDocument;
 import com.github.danbel.sazonovapi.domain.DocumentType;
 import com.github.danbel.sazonovapi.dto.ApplicationCreateRequest;
 import com.github.danbel.sazonovapi.dto.ApplicationResponse;
+import com.github.danbel.sazonovapi.dto.ApplicationUpdateRequest;
 import com.github.danbel.sazonovapi.service.ApiMapper;
 import com.github.danbel.sazonovapi.service.ApplicationService;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -50,6 +52,18 @@ public class ApplicantController {
     @GetMapping("/applications/{id}")
     public ApplicationResponse one(Authentication authentication, @PathVariable Long id) {
         return ApiMapper.applicationResponse(applicationService.getApplication(authentication, id));
+    }
+
+    @PutMapping("/applications/{id}")
+    public ApplicationResponse update(Authentication authentication,
+                                      @PathVariable Long id,
+                                      @Valid @RequestBody ApplicationUpdateRequest request) {
+        return ApiMapper.applicationResponse(applicationService.updateApplication(authentication, id, request));
+    }
+
+    @PostMapping("/applications/{id}/cancel")
+    public ApplicationResponse cancel(Authentication authentication, @PathVariable Long id) {
+        return ApiMapper.applicationResponse(applicationService.cancelApplication(authentication, id));
     }
 
     @PostMapping(value = "/applications/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

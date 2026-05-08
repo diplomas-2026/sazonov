@@ -1,6 +1,7 @@
 package com.github.danbel.sazonovapi.service;
 
 import com.github.danbel.sazonovapi.domain.AdmissionApplication;
+import com.github.danbel.sazonovapi.domain.ApplicationStatus;
 import com.github.danbel.sazonovapi.domain.Speciality;
 import com.github.danbel.sazonovapi.dto.LeaderboardEntryResponse;
 import com.github.danbel.sazonovapi.dto.LeaderboardResponse;
@@ -27,6 +28,7 @@ public class LeaderboardService {
             .map(speciality -> {
                 List<AdmissionApplication> specialityApplications = applications.stream()
                     .filter(application -> application.getSpeciality().getId().equals(speciality.getId()))
+                    .filter(application -> application.getStatus() == ApplicationStatus.ACCEPTED)
                     .sorted(Comparator
                         .comparing(AdmissionApplication::getPoints, Comparator.reverseOrder())
                         .thenComparing(AdmissionApplication::getCreatedAt)

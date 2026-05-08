@@ -5,5 +5,6 @@ public enum ApplicationStatus {
     UNDER_REVIEW,
     MISSING_DOCS,
     ACCEPTED,
-    REJECTED
+    REJECTED,
+    CANCELLED
 }

@@ -8,6 +8,7 @@ import com.github.danbel.sazonovapi.domain.DocumentType;
 import com.github.danbel.sazonovapi.domain.Role;
 import com.github.danbel.sazonovapi.domain.Speciality;
 import com.github.danbel.sazonovapi.dto.ApplicationCreateRequest;
+import com.github.danbel.sazonovapi.dto.ApplicationUpdateRequest;
 import com.github.danbel.sazonovapi.dto.ApplicationStatusUpdateRequest;
 import com.github.danbel.sazonovapi.repository.AdmissionApplicationRepository;
 import com.github.danbel.sazonovapi.repository.ApplicationDocumentRepository;
@@ -50,6 +51,53 @@ public class ApplicationService {
         application.setPoints(request.points());
         application.setApplicantComment(request.applicantComment());
         application.setStatus(ApplicationStatus.SUBMITTED);
+        return applicationRepository.save(application);
+    }
+
+    public AdmissionApplication updateApplication(Authentication authentication, Long id, ApplicationUpdateRequest request) {
+        AdmissionApplication application = applicationRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена"));
+        AppUser user = currentUser(authentication);
+        if (!application.getApplicant().getUsername().equals(user.getUsername())) {
+            throw new AccessDeniedException("Можно редактировать только свою заявку");
+        }
+        if (application.getStatus() == ApplicationStatus.ACCEPTED
+            || application.getStatus() == ApplicationStatus.REJECTED
+            || application.getStatus() == ApplicationStatus.CANCELLED) {
+            throw new IllegalStateException("Эту заявку уже нельзя редактировать");
+        }
+
+        Speciality speciality = specialityRepository.findById(request.specialityId())
+            .orElseThrow(() -> new IllegalArgumentException("Специальность не найдена"));
+
+        application.setSpeciality(speciality);
+        application.setPassportSeries(request.passportSeries().trim());
+        application.setPassportNumber(request.passportNumber().trim());
+        application.setSnils(request.snils().trim());
+        application.setEducationDocumentNumber(request.educationDocumentNumber().trim());
+        application.setGraduationSchool(request.graduationSchool().trim());
+        application.setGraduationYear(request.graduationYear());
+        application.setPoints(request.points());
+        application.setApplicantComment(request.applicantComment());
+        application.touch();
+        return applicationRepository.save(application);
+    }
+
+    public AdmissionApplication cancelApplication(Authentication authentication, Long id) {
+        AdmissionApplication application = applicationRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена"));
+        AppUser user = currentUser(authentication);
+        if (!application.getApplicant().getUsername().equals(user.getUsername())) {
+            throw new AccessDeniedException("Можно отменить только свою заявку");
+        }
+        if (application.getStatus() == ApplicationStatus.CANCELLED) {
+            throw new IllegalStateException("Заявка уже отменена");
+        }
+        if (application.getStatus() == ApplicationStatus.ACCEPTED || application.getStatus() == ApplicationStatus.REJECTED) {
+            throw new IllegalStateException("Эту заявку нельзя отменить");
+        }
+        application.setStatus(ApplicationStatus.CANCELLED);
+        application.touch();
         return applicationRepository.save(application);
     }
 
