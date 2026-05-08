@@ -197,6 +197,30 @@ const emptyUser = {
   active: true,
 };
 
+const emptyDepartmentErrors = {
+  code: '',
+  name: '',
+  description: '',
+};
+
+const emptySpecialityErrors = {
+  departmentId: '',
+  code: '',
+  name: '',
+  budgetPlaces: '',
+  paidPlaces: '',
+  description: '',
+};
+
+const emptyUserErrors = {
+  fullName: '',
+  username: '',
+  password: '',
+  email: '',
+  phone: '',
+  role: '',
+};
+
 function App() {
   const [booting, setBooting] = useState(true);
   const [auth, setAuth] = useState(null);
@@ -243,6 +267,9 @@ function App() {
   const [savingApplicationEdit, setSavingApplicationEdit] = useState(false);
   const [cancellingApplication, setCancellingApplication] = useState(false);
   const [updatingApplicationId, setUpdatingApplicationId] = useState('');
+  const [departmentErrors, setDepartmentErrors] = useState(emptyDepartmentErrors);
+  const [specialityErrors, setSpecialityErrors] = useState(emptySpecialityErrors);
+  const [userErrors, setUserErrors] = useState(emptyUserErrors);
 
   const loadPublic = useCallback(async () => {
     try {
@@ -627,8 +654,76 @@ function App() {
     setApplicationSearchQuery('');
     setApplicationSortMode('newest');
     setApplicationStatusFilter('ALL');
+    setDepartmentErrors(emptyDepartmentErrors);
+    setSpecialityErrors(emptySpecialityErrors);
+    setUserErrors(emptyUserErrors);
     setMessage('Сеанс завершён');
     await loadPublic();
+  }
+
+  function validateDepartmentForm(form) {
+    const nextErrors = { ...emptyDepartmentErrors };
+    if (!form.code.trim()) {
+      nextErrors.code = 'Укажите код отделения';
+    }
+    if (!form.name.trim()) {
+      nextErrors.name = 'Укажите название отделения';
+    }
+    setDepartmentErrors(nextErrors);
+    return !Object.values(nextErrors).some(Boolean);
+  }
+
+  function validateSpecialityForm(form) {
+    const nextErrors = { ...emptySpecialityErrors };
+    if (!form.departmentId) {
+      nextErrors.departmentId = 'Выберите отделение';
+    }
+    if (!form.code.trim()) {
+      nextErrors.code = 'Укажите код специальности';
+    }
+    if (!form.name.trim()) {
+      nextErrors.name = 'Укажите название специальности';
+    }
+    if (form.budgetPlaces === '' || Number.isNaN(Number(form.budgetPlaces)) || Number(form.budgetPlaces) < 0) {
+      nextErrors.budgetPlaces = 'Введите число 0 или больше';
+    }
+    if (form.paidPlaces === '' || Number.isNaN(Number(form.paidPlaces)) || Number(form.paidPlaces) < 0) {
+      nextErrors.paidPlaces = 'Введите число 0 или больше';
+    }
+    setSpecialityErrors(nextErrors);
+    return !Object.values(nextErrors).some(Boolean);
+  }
+
+  function validateUserForm(form, isUpdate) {
+    const nextErrors = { ...emptyUserErrors };
+    if (!form.fullName.trim()) {
+      nextErrors.fullName = 'Укажите ФИО';
+    }
+    if (!form.username.trim()) {
+      nextErrors.username = 'Укажите логин';
+    } else if (form.username.trim().length < 3 || form.username.trim().length > 50) {
+      nextErrors.username = 'Логин должен быть от 3 до 50 символов';
+    }
+    if (!isUpdate || form.password.trim()) {
+      if (!form.password.trim()) {
+        nextErrors.password = 'Укажите пароль';
+      } else if (form.password.trim().length < 6) {
+        nextErrors.password = 'Пароль должен быть не короче 6 символов';
+      }
+    }
+    if (!form.email.trim()) {
+      nextErrors.email = 'Укажите email';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      nextErrors.email = 'Введите корректный email';
+    }
+    if (!form.phone.trim()) {
+      nextErrors.phone = 'Укажите телефон';
+    }
+    if (!form.role) {
+      nextErrors.role = 'Выберите роль';
+    }
+    setUserErrors(nextErrors);
+    return !Object.values(nextErrors).some(Boolean);
   }
 
   async function handleSaveProfile(event) {
@@ -839,6 +934,11 @@ function App() {
     setError('');
     setMessage('');
 
+    if (!validateSpecialityForm(specialityForm)) {
+      setError('Проверьте поля формы специальности');
+      return;
+    }
+
     try {
       const payload = {
         ...specialityForm,
@@ -913,6 +1013,11 @@ function App() {
     setError('');
     setMessage('');
 
+    if (!validateUserForm(userForm, Boolean(selectedAdminUser))) {
+      setError('Проверьте поля формы пользователя');
+      return;
+    }
+
     try {
       const payload = {
         fullName: userForm.fullName,
@@ -955,6 +1060,7 @@ function App() {
   function selectSpecialityForEditing(speciality) {
     setCreatingSpeciality(false);
     setSelectedSpecialityId(`${speciality.id}`);
+    setSpecialityErrors(emptySpecialityErrors);
     setSpecialityForm({
       departmentId: `${speciality.department?.id || ''}`,
       code: speciality.code,
@@ -969,6 +1075,7 @@ function App() {
   function selectUserForEditing(user) {
     setCreatingUser(false);
     setSelectedUserId(`${user.id}`);
+    setUserErrors(emptyUserErrors);
     setUserForm({
       fullName: user.fullName,
       username: user.username,
@@ -984,6 +1091,7 @@ function App() {
   function startNewSpeciality() {
     setCreatingSpeciality(true);
     setSelectedSpecialityId('');
+    setSpecialityErrors(emptySpecialityErrors);
     setSpecialityForm({
       ...emptySpeciality,
       departmentId: selectedDepartment?.id ? `${selectedDepartment.id}` : `${adminDepartments[0]?.id || ''}`,
@@ -996,6 +1104,11 @@ function App() {
     if (!auth || auth.user.role !== 'ADMIN') return;
     setError('');
     setMessage('');
+
+    if (!validateDepartmentForm(departmentForm)) {
+      setError('Проверьте поля формы отделения');
+      return;
+    }
 
     try {
       const payload = {
@@ -1059,6 +1172,7 @@ function App() {
   function selectDepartmentForEditing(department) {
     setCreatingDepartment(false);
     setSelectedDepartmentId(`${department.id}`);
+    setDepartmentErrors(emptyDepartmentErrors);
     setDepartmentForm({
       code: department.code,
       name: department.name,
@@ -1070,6 +1184,7 @@ function App() {
   function startNewDepartment() {
     setCreatingDepartment(true);
     setSelectedDepartmentId('');
+    setDepartmentErrors(emptyDepartmentErrors);
     setDepartmentForm(emptyDepartment);
     setActiveSection('department-form');
   }
@@ -1077,6 +1192,7 @@ function App() {
   function startNewUser() {
     setCreatingUser(true);
     setSelectedUserId('');
+    setUserErrors(emptyUserErrors);
     setUserForm(emptyUser);
     setActiveSection('user-form');
   }
@@ -1266,6 +1382,7 @@ function App() {
               adminUsers,
               specialityForm,
               setSpecialityForm,
+              specialityErrors,
               selectedAdminSpeciality,
               selectSpecialityForEditing,
               startNewSpeciality,
@@ -1274,6 +1391,7 @@ function App() {
               primaryActionLabel,
               departmentForm,
               setDepartmentForm,
+              departmentErrors,
               selectedDepartment,
               selectDepartmentForEditing,
               startNewDepartment,
@@ -1283,6 +1401,7 @@ function App() {
               adminDepartments,
               userForm,
               setUserForm,
+              userErrors,
               selectedAdminUser,
               selectUserForEditing,
               startNewUser,
@@ -3040,6 +3159,7 @@ function AdminDepartmentsSection({
 function AdminDepartmentFormSection({
   departmentForm,
   setDepartmentForm,
+  departmentErrors,
   selectedDepartment,
   setActiveSection,
   handleDepartmentSave,
@@ -3061,34 +3181,30 @@ function AdminDepartmentFormSection({
           </Stack>
 
           <Stack component="form" spacing={2} onSubmit={handleDepartmentSave}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Код"
-                  value={departmentForm.code}
-                  onChange={(event) => setDepartmentForm({ ...departmentForm, code: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Название"
-                  value={departmentForm.name}
-                  onChange={(event) => setDepartmentForm({ ...departmentForm, name: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Описание"
-                  value={departmentForm.description}
-                  onChange={(event) => setDepartmentForm({ ...departmentForm, description: event.target.value })}
-                  multiline
-                  minRows={4}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
+            <TextField
+              label="Код"
+              value={departmentForm.code}
+              onChange={(event) => setDepartmentForm({ ...departmentForm, code: event.target.value })}
+              error={Boolean(departmentErrors.code)}
+              helperText={departmentErrors.code}
+              fullWidth
+            />
+            <TextField
+              label="Название"
+              value={departmentForm.name}
+              onChange={(event) => setDepartmentForm({ ...departmentForm, name: event.target.value })}
+              error={Boolean(departmentErrors.name)}
+              helperText={departmentErrors.name}
+              fullWidth
+            />
+            <TextField
+              label="Описание"
+              value={departmentForm.description}
+              onChange={(event) => setDepartmentForm({ ...departmentForm, description: event.target.value })}
+              multiline
+              minRows={4}
+              fullWidth
+            />
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
               <Button type="submit" variant="contained">
@@ -3165,6 +3281,7 @@ function AdminSpecialityFormSection({
   adminDepartments,
   specialityForm,
   setSpecialityForm,
+  specialityErrors,
   selectedAdminSpeciality,
   setActiveSection,
   handleSpecialitySave,
@@ -3186,68 +3303,64 @@ function AdminSpecialityFormSection({
           </Stack>
 
           <Stack component="form" spacing={2} onSubmit={handleSpecialitySave}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  select
-                  label="Отделение"
-                  value={specialityForm.departmentId}
-                  onChange={(event) => setSpecialityForm({ ...specialityForm, departmentId: event.target.value })}
-                  fullWidth
-                >
-                  <MenuItem value="">Выберите отделение</MenuItem>
-                  {adminDepartments.map((department) => (
-                    <MenuItem key={department.id} value={department.id}>
-                      {department.code} · {department.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Код"
-                  value={specialityForm.code}
-                  onChange={(event) => setSpecialityForm({ ...specialityForm, code: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Название"
-                  value={specialityForm.name}
-                  onChange={(event) => setSpecialityForm({ ...specialityForm, name: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Бюджетные места"
-                  type="number"
-                  value={specialityForm.budgetPlaces}
-                  onChange={(event) => setSpecialityForm({ ...specialityForm, budgetPlaces: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Платные места"
-                  type="number"
-                  value={specialityForm.paidPlaces}
-                  onChange={(event) => setSpecialityForm({ ...specialityForm, paidPlaces: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Описание"
-                  value={specialityForm.description}
-                  onChange={(event) => setSpecialityForm({ ...specialityForm, description: event.target.value })}
-                  multiline
-                  minRows={4}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
+            <TextField
+              select
+              label="Отделение"
+              value={specialityForm.departmentId}
+              onChange={(event) => setSpecialityForm({ ...specialityForm, departmentId: event.target.value })}
+              error={Boolean(specialityErrors.departmentId)}
+              helperText={specialityErrors.departmentId}
+              fullWidth
+            >
+              <MenuItem value="">Выберите отделение</MenuItem>
+              {adminDepartments.map((department) => (
+                <MenuItem key={department.id} value={department.id}>
+                  {department.code} · {department.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Код"
+              value={specialityForm.code}
+              onChange={(event) => setSpecialityForm({ ...specialityForm, code: event.target.value })}
+              error={Boolean(specialityErrors.code)}
+              helperText={specialityErrors.code}
+              fullWidth
+            />
+            <TextField
+              label="Название"
+              value={specialityForm.name}
+              onChange={(event) => setSpecialityForm({ ...specialityForm, name: event.target.value })}
+              error={Boolean(specialityErrors.name)}
+              helperText={specialityErrors.name}
+              fullWidth
+            />
+            <TextField
+              label="Бюджетные места"
+              type="number"
+              value={specialityForm.budgetPlaces}
+              onChange={(event) => setSpecialityForm({ ...specialityForm, budgetPlaces: event.target.value })}
+              error={Boolean(specialityErrors.budgetPlaces)}
+              helperText={specialityErrors.budgetPlaces}
+              fullWidth
+            />
+            <TextField
+              label="Платные места"
+              type="number"
+              value={specialityForm.paidPlaces}
+              onChange={(event) => setSpecialityForm({ ...specialityForm, paidPlaces: event.target.value })}
+              error={Boolean(specialityErrors.paidPlaces)}
+              helperText={specialityErrors.paidPlaces}
+              fullWidth
+            />
+            <TextField
+              label="Описание"
+              value={specialityForm.description}
+              onChange={(event) => setSpecialityForm({ ...specialityForm, description: event.target.value })}
+              multiline
+              minRows={4}
+              fullWidth
+            />
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
               <Button type="submit" variant="contained">
@@ -3320,6 +3433,7 @@ function AdminUsersSection({
 function AdminUserFormSection({
   userForm,
   setUserForm,
+  userErrors,
   selectedAdminUser,
   setActiveSection,
   handleUserSave,
@@ -3340,77 +3454,73 @@ function AdminUserFormSection({
           </Stack>
 
           <Stack component="form" spacing={2} onSubmit={handleUserSave}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="ФИО"
-                  value={userForm.fullName}
-                  onChange={(event) => setUserForm({ ...userForm, fullName: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Логин"
-                  value={userForm.username}
-                  onChange={(event) => setUserForm({ ...userForm, username: event.target.value })}
-                  fullWidth
-                  InputProps={{ readOnly: Boolean(selectedAdminUser) }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Пароль"
-                  type="password"
-                  value={userForm.password}
-                  onChange={(event) => setUserForm({ ...userForm, password: event.target.value })}
-                  placeholder={selectedAdminUser ? 'Оставьте пустым, если не меняете' : ''}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={userForm.email}
-                  onChange={(event) => setUserForm({ ...userForm, email: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Телефон"
-                  value={userForm.phone}
-                  onChange={(event) => setUserForm({ ...userForm, phone: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField
-                  select
-                  label="Роль"
-                  value={userForm.role}
-                  onChange={(event) => setUserForm({ ...userForm, role: event.target.value })}
-                  fullWidth
-                >
-                  <MenuItem value="STAFF">Сотрудник</MenuItem>
-                  <MenuItem value="ADMIN">Администратор</MenuItem>
-                  <MenuItem value="APPLICANT">Абитуриент</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField
-                  select
-                  label="Активность"
-                  value={userForm.active ? 'true' : 'false'}
-                  onChange={(event) => setUserForm({ ...userForm, active: event.target.value === 'true' })}
-                  fullWidth
-                >
-                  <MenuItem value="true">Активен</MenuItem>
-                  <MenuItem value="false">Отключен</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
+            <TextField
+              label="ФИО"
+              value={userForm.fullName}
+              onChange={(event) => setUserForm({ ...userForm, fullName: event.target.value })}
+              error={Boolean(userErrors.fullName)}
+              helperText={userErrors.fullName}
+              fullWidth
+            />
+            <TextField
+              label="Логин"
+              value={userForm.username}
+              onChange={(event) => setUserForm({ ...userForm, username: event.target.value })}
+              error={Boolean(userErrors.username)}
+              helperText={userErrors.username}
+              fullWidth
+              InputProps={{ readOnly: Boolean(selectedAdminUser) }}
+            />
+            <TextField
+              label="Пароль"
+              type="password"
+              value={userForm.password}
+              onChange={(event) => setUserForm({ ...userForm, password: event.target.value })}
+              placeholder={selectedAdminUser ? 'Оставьте пустым, если не меняете' : ''}
+              error={Boolean(userErrors.password)}
+              helperText={userErrors.password || (selectedAdminUser ? 'Минимум 6 символов, если меняете пароль' : 'Минимум 6 символов')}
+              fullWidth
+            />
+            <TextField
+              label="Email"
+              type="email"
+              value={userForm.email}
+              onChange={(event) => setUserForm({ ...userForm, email: event.target.value })}
+              error={Boolean(userErrors.email)}
+              helperText={userErrors.email}
+              fullWidth
+            />
+            <TextField
+              label="Телефон"
+              value={userForm.phone}
+              onChange={(event) => setUserForm({ ...userForm, phone: event.target.value })}
+              error={Boolean(userErrors.phone)}
+              helperText={userErrors.phone}
+              fullWidth
+            />
+            <TextField
+              select
+              label="Роль"
+              value={userForm.role}
+              onChange={(event) => setUserForm({ ...userForm, role: event.target.value })}
+              error={Boolean(userErrors.role)}
+              helperText={userErrors.role}
+              fullWidth
+            >
+              <MenuItem value="STAFF">Сотрудник</MenuItem>
+              <MenuItem value="ADMIN">Администратор</MenuItem>
+              <MenuItem value="APPLICANT">Абитуриент</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label="Активность"
+              value={userForm.active ? 'true' : 'false'}
+              onChange={(event) => setUserForm({ ...userForm, active: event.target.value === 'true' })}
+              fullWidth
+            >
+              <MenuItem value="true">Активен</MenuItem>
+              <MenuItem value="false">Отключен</MenuItem>
+            </TextField>
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
               <Button type="submit" variant="contained">
