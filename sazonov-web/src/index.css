@@ -1,13 +1,42 @@
+:root {
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at top, rgba(30, 41, 59, 0.92), rgba(2, 6, 23, 1) 58%),
+    linear-gradient(180deg, #06111f, #020617);
+}
+
+html {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(30, 64, 175, 0.18), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.16), transparent 24%),
+    linear-gradient(180deg, #07111f, #020617 68%);
+  color: #e2e8f0;
+  font-family: Inter, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
 }
