@@ -188,6 +188,7 @@ function App() {
   const [creatingDepartment, setCreatingDepartment] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
   const [activeSection, setActiveSection] = useState('');
+  const [authView, setAuthView] = useState('home');
   const [savingApplicationEdit, setSavingApplicationEdit] = useState(false);
   const [cancellingApplication, setCancellingApplication] = useState(false);
   const [updatingApplicationId, setUpdatingApplicationId] = useState('');
@@ -552,6 +553,7 @@ function App() {
   async function handleLogout() {
     clearStoredAuth();
     setAuth(null);
+    setAuthView('home');
     setApplicantApplications([]);
     setStaffApplications([]);
     setAdminUsers([]);
@@ -1153,147 +1155,21 @@ function App() {
             </CardContent>
           </Card>
         ) : !auth ? (
-          <Grid container spacing={3} alignItems="stretch">
-            <Grid item xs={12} md={7}>
-              <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Stack spacing={3}>
-                    <Box>
-                      <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 0.6 }}>
-                        Приемная кампания
-                      </Typography>
-                      <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, mb: 1 }}>
-                        Единая система учета заявок, документов и статусов
-                      </Typography>
-                      <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
-                        Платформа для абитуриентов, сотрудников и администратора: личный кабинет, проверка документов,
-                        конкурсные списки и статистика приемной комиссии.
-                      </Typography>
-                    </Box>
-
-                    <Grid container spacing={2}>
-                      <FeatureCard
-                        icon={<School fontSize="small" />}
-                        title="Абитуриент"
-                        text="Подает заявку, загружает документы и отслеживает статус в личном кабинете."
-                      />
-                      <FeatureCard
-                        icon={<AssignmentTurnedIn fontSize="small" />}
-                        title="Сотрудник"
-                        text="Проверяет пакет документов, меняет статус и оставляет комментарии по заявке."
-                      />
-                      <FeatureCard
-                        icon={<AdminPanelSettings fontSize="small" />}
-                        title="Администратор"
-                        text="Управляет пользователями, отделениями, специальностями и видит общую аналитику приемной кампании."
-                      />
-                    </Grid>
-
-                    <Divider />
-
-                    <Grid container spacing={2}>
-                      <MetricCard label="Отделений" value={publicDepartments.length} />
-                      <MetricCard label="Специальностей" value={publicSpecialities.length} />
-                      <MetricCard label="Заявок" value={publicDashboard?.totalApplications || 0} />
-                      <MetricCard label="На проверке" value={publicDashboard?.underReview || 0} />
-                    </Grid>
-
-                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                      <Chip label={`Одобрено: ${publicDashboard?.accepted || 0}`} color="success" variant="outlined" />
-                      <Chip label={`Отклонено: ${publicDashboard?.rejected || 0}`} color="error" variant="outlined" />
-                      <Chip label={`Нужны документы: ${publicDashboard?.missingDocs || 0}`} color="warning" variant="outlined" />
-                    </Stack>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} md={5}>
-              <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Tabs
-                    value={mode}
-                    onChange={(_, nextMode) => setMode(nextMode)}
-                    textColor="primary"
-                    indicatorColor="primary"
-                    sx={{ mb: 2 }}
-                  >
-                    <Tab value="login" label="Вход" />
-                    <Tab value="register" label="Регистрация" />
-                  </Tabs>
-
-                  {mode === 'login' ? (
-                    <Stack component="form" spacing={2} onSubmit={handleLogin}>
-                      <TextField
-                        label="Логин"
-                        value={loginForm.username}
-                        onChange={(event) => setLoginForm({ ...loginForm, username: event.target.value })}
-                        placeholder="admin"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Пароль"
-                        type="password"
-                        value={loginForm.password}
-                        onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })}
-                        placeholder="admin123"
-                        fullWidth
-                      />
-                      <Button type="submit" variant="contained" startIcon={<Login />} sx={{ alignSelf: 'flex-start' }}>
-                        Войти
-                      </Button>
-                      <Typography variant="body2" color="text.secondary">
-                        Демо-доступ: <strong>admin / admin123</strong> или <strong>staff / staff123</strong>
-                      </Typography>
-                    </Stack>
-                  ) : (
-                    <Stack component="form" spacing={2} onSubmit={handleRegister}>
-                      <TextField
-                        label="ФИО"
-                        value={registerForm.fullName}
-                        onChange={(event) => setRegisterForm({ ...registerForm, fullName: event.target.value })}
-                        placeholder="Иванов Иван Иванович"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Логин"
-                        value={registerForm.username}
-                        onChange={(event) => setRegisterForm({ ...registerForm, username: event.target.value })}
-                        placeholder="ivanov"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Пароль"
-                        type="password"
-                        value={registerForm.password}
-                        onChange={(event) => setRegisterForm({ ...registerForm, password: event.target.value })}
-                        placeholder="Не меньше 6 символов"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Email"
-                        type="email"
-                        value={registerForm.email}
-                        onChange={(event) => setRegisterForm({ ...registerForm, email: event.target.value })}
-                        placeholder="student@example.com"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Телефон"
-                        value={registerForm.phone}
-                        onChange={(event) => setRegisterForm({ ...registerForm, phone: event.target.value })}
-                        placeholder="+7 (900) 000-00-00"
-                        fullWidth
-                      />
-                      <Button type="submit" variant="contained" startIcon={<ManageAccounts />} sx={{ alignSelf: 'flex-start' }}>
-                        Создать аккаунт
-                      </Button>
-                    </Stack>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+          <AuthSection
+            authView={authView}
+            setAuthView={setAuthView}
+            mode={mode}
+            setMode={setMode}
+            loginForm={loginForm}
+            setLoginForm={setLoginForm}
+            handleLogin={handleLogin}
+            registerForm={registerForm}
+            setRegisterForm={setRegisterForm}
+            handleRegister={handleRegister}
+            publicDepartments={publicDepartments}
+            publicSpecialities={publicSpecialities}
+            publicDashboard={publicDashboard}
+          />
         ) : (
           <Stack spacing={3}>
             {renderActiveSection({
@@ -1364,6 +1240,8 @@ function App() {
               handleUserSave,
               userActionLabel,
               updatingApplicationId,
+              authView,
+              setAuthView,
             })}
           </Stack>
         )}
@@ -1483,6 +1361,223 @@ function renderActiveSection(props) {
     default:
       return null;
   }
+}
+
+function AuthSection({
+  authView,
+  setAuthView,
+  mode,
+  setMode,
+  loginForm,
+  setLoginForm,
+  handleLogin,
+  registerForm,
+  setRegisterForm,
+  handleRegister,
+  publicDepartments,
+  publicSpecialities,
+  publicDashboard,
+}) {
+  if (authView === 'home') {
+    return (
+      <Card variant="outlined" sx={{ borderRadius: 3 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Stack spacing={3}>
+            <Box>
+              <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 0.6 }}>
+                Приемная кампания
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, mb: 1 }}>
+                Единая система учета заявок, документов и статусов
+              </Typography>
+              <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
+                Платформа для абитуриентов, сотрудников и администратора: личный кабинет, проверка документов,
+                конкурсные списки и статистика приемной комиссии.
+              </Typography>
+            </Box>
+
+            <Grid container spacing={2}>
+              <FeatureCard
+                icon={<School fontSize="small" />}
+                title="Абитуриент"
+                text="Подает заявку, загружает документы и отслеживает статус в личном кабинете."
+              />
+              <FeatureCard
+                icon={<AssignmentTurnedIn fontSize="small" />}
+                title="Сотрудник"
+                text="Проверяет пакет документов, меняет статус и оставляет комментарии по заявке."
+              />
+              <FeatureCard
+                icon={<AdminPanelSettings fontSize="small" />}
+                title="Администратор"
+                text="Управляет пользователями, отделениями, специальностями и видит общую аналитику приемной кампании."
+              />
+            </Grid>
+
+            <Divider />
+
+            <Grid container spacing={2}>
+              <MetricCard label="Отделений" value={publicDepartments.length} />
+              <MetricCard label="Специальностей" value={publicSpecialities.length} />
+              <MetricCard label="Заявок" value={publicDashboard?.totalApplications || 0} />
+              <MetricCard label="На проверке" value={publicDashboard?.underReview || 0} />
+            </Grid>
+
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Button variant="contained" startIcon={<Login />} onClick={() => setAuthView('auth')} sx={{ borderRadius: 2 }}>
+                Войти
+              </Button>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Grid container spacing={3} alignItems="stretch">
+      <Grid item xs={12} md={7}>
+        <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Stack spacing={3}>
+              <Box>
+                <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 0.6 }}>
+                  Приемная кампания
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, mb: 1 }}>
+                  Единая система учета заявок, документов и статусов
+                </Typography>
+                <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
+                  Платформа для абитуриентов, сотрудников и администратора: личный кабинет, проверка документов,
+                  конкурсные списки и статистика приемной комиссии.
+                </Typography>
+              </Box>
+
+              <Grid container spacing={2}>
+                <FeatureCard
+                  icon={<School fontSize="small" />}
+                  title="Абитуриент"
+                  text="Подает заявку, загружает документы и отслеживает статус в личном кабинете."
+                />
+                <FeatureCard
+                  icon={<AssignmentTurnedIn fontSize="small" />}
+                  title="Сотрудник"
+                  text="Проверяет пакет документов, меняет статус и оставляет комментарии по заявке."
+                />
+                <FeatureCard
+                  icon={<AdminPanelSettings fontSize="small" />}
+                  title="Администратор"
+                  text="Управляет пользователями, отделениями, специальностями и видит общую аналитику приемной кампании."
+                />
+              </Grid>
+
+              <Divider />
+
+              <Grid container spacing={2}>
+                <MetricCard label="Отделений" value={0} />
+                <MetricCard label="Специальностей" value={0} />
+                <MetricCard label="Заявок" value={0} />
+                <MetricCard label="На проверке" value={0} />
+              </Grid>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={5}>
+        <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Stack spacing={2.5}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Авторизация
+                </Typography>
+                <Button variant="text" onClick={() => setAuthView('home')}>
+                  На главную
+                </Button>
+              </Stack>
+
+              <Tabs
+                value={mode}
+                onChange={(_, nextMode) => setMode(nextMode)}
+                textColor="primary"
+                indicatorColor="primary"
+              >
+                <Tab value="login" label="Вход" />
+                <Tab value="register" label="Регистрация" />
+              </Tabs>
+
+              {mode === 'login' ? (
+                <Stack component="form" spacing={2} onSubmit={handleLogin}>
+                  <TextField
+                    label="Логин"
+                    value={loginForm.username}
+                    onChange={(event) => setLoginForm({ ...loginForm, username: event.target.value })}
+                    placeholder="Логин"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Пароль"
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })}
+                    placeholder="Пароль"
+                    fullWidth
+                  />
+                  <Button type="submit" variant="contained" startIcon={<Login />} sx={{ alignSelf: 'flex-start' }}>
+                    Войти
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack component="form" spacing={2} onSubmit={handleRegister}>
+                  <TextField
+                    label="ФИО"
+                    value={registerForm.fullName}
+                    onChange={(event) => setRegisterForm({ ...registerForm, fullName: event.target.value })}
+                    placeholder="Иванов Иван Иванович"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Логин"
+                    value={registerForm.username}
+                    onChange={(event) => setRegisterForm({ ...registerForm, username: event.target.value })}
+                    placeholder="ivanov"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Пароль"
+                    type="password"
+                    value={registerForm.password}
+                    onChange={(event) => setRegisterForm({ ...registerForm, password: event.target.value })}
+                    placeholder="Не меньше 6 символов"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Email"
+                    type="email"
+                    value={registerForm.email}
+                    onChange={(event) => setRegisterForm({ ...registerForm, email: event.target.value })}
+                    placeholder="student@example.com"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Телефон"
+                    value={registerForm.phone}
+                    onChange={(event) => setRegisterForm({ ...registerForm, phone: event.target.value })}
+                    placeholder="+7 (900) 000-00-00"
+                    fullWidth
+                  />
+                  <Button type="submit" variant="contained" startIcon={<ManageAccounts />} sx={{ alignSelf: 'flex-start' }}>
+                    Создать аккаунт
+                  </Button>
+                </Stack>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+  );
 }
 
 function ApplicantProfileSection({ profileForm, setProfileForm, handleSaveProfile }) {
