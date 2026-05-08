@@ -48,6 +48,6 @@ public class SpecialityService {
         speciality.setDescription(request.description());
         speciality.setBudgetPlaces(request.budgetPlaces());
         speciality.setPaidPlaces(request.paidPlaces());
-        speciality.setAdmissionPlan(request.admissionPlan());
+        speciality.setAdmissionPlan(speciality.getBudgetPlaces() + speciality.getPaidPlaces());
     }
 }

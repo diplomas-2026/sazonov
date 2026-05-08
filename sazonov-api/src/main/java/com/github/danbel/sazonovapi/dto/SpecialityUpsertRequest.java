@@ -11,7 +11,6 @@ public record SpecialityUpsertRequest(
     @NotBlank String name,
     String description,
     @NotNull @Min(0) @PositiveOrZero Integer budgetPlaces,
-    @NotNull @Min(0) @PositiveOrZero Integer paidPlaces,
-    @NotNull @Min(0) @PositiveOrZero Integer admissionPlan
+    @NotNull @Min(0) @PositiveOrZero Integer paidPlaces
 ) {
 }

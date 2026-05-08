@@ -407,7 +407,6 @@ function App() {
           description: first.description || '',
           budgetPlaces: first.budgetPlaces,
           paidPlaces: first.paidPlaces,
-          admissionPlan: first.admissionPlan,
         });
       }
     }
@@ -846,7 +845,6 @@ function App() {
         departmentId: Number(specialityForm.departmentId),
         budgetPlaces: Number(specialityForm.budgetPlaces),
         paidPlaces: Number(specialityForm.paidPlaces),
-        admissionPlan: Number(specialityForm.admissionPlan),
       };
       let saved;
       if (selectedAdminSpeciality) {
