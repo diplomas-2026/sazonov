@@ -18,10 +18,6 @@ export function clearStoredAuth() {
   localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
-export function createBasicToken(username, password) {
-  return `Basic ${btoa(`${username}:${password}`)}`;
-}
-
 async function request(path, { token, method = 'GET', body, isFormData = false } = {}) {
   const headers = {};
   if (token) {
@@ -65,7 +61,7 @@ export const api = {
   request,
   blobRequest,
   login: (username, password) =>
-    request('/auth/login', { token: createBasicToken(username, password), method: 'POST' }),
+    request('/auth/login', { method: 'POST', body: { username, password } }),
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
   me: (token) => request('/auth/me', { token }),
   updateMe: (token, payload) => request('/auth/me', { token, method: 'PUT', body: payload }),

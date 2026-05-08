@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import './App.css';
-import { api, clearStoredAuth, createBasicToken, loadStoredAuth, saveStoredAuth } from './api';
+import { api, clearStoredAuth, loadStoredAuth, saveStoredAuth } from './api';
 
 const STATUS_LABELS = {
   SUBMITTED: 'Подана',
@@ -122,7 +122,7 @@ function App() {
     (async () => {
       try {
         const me = await api.me(stored.token);
-        const nextAuth = { token: stored.token, user: me.user };
+        const nextAuth = { token: me.token || stored.token, user: me.user };
         setAuth(nextAuth);
         saveStoredAuth(nextAuth);
         setProfileForm({
@@ -274,9 +274,8 @@ function App() {
     setMessage('');
 
     try {
-      const token = createBasicToken(loginForm.username, loginForm.password);
       const response = await api.login(loginForm.username, loginForm.password);
-      const nextAuth = { token, user: response.user };
+      const nextAuth = { token: response.token, user: response.user };
       setAuth(nextAuth);
       saveStoredAuth(nextAuth);
       setMessage(`Добро пожаловать, ${response.user.fullName}`);
@@ -293,9 +292,8 @@ function App() {
 
     try {
       const created = await api.register(registerForm);
-      const token = createBasicToken(registerForm.username, registerForm.password);
       const response = await api.login(registerForm.username, registerForm.password);
-      const nextAuth = { token, user: response.user };
+      const nextAuth = { token: response.token, user: response.user };
       setAuth(nextAuth);
       saveStoredAuth(nextAuth);
       setMessage(`Аккаунт создан: ${created.fullName}`);

@@ -4,8 +4,9 @@ import com.github.danbel.sazonovapi.domain.Role;
 import java.util.List;
 
 public record AuthLoginResponse(
-    UserResponse user,
+    String token,
     String tokenType,
+    UserResponse user,
     List<Role> roles
 ) {
 }
