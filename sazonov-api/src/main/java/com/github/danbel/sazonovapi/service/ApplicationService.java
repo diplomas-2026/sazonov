@@ -36,7 +36,7 @@ public class ApplicationService {
     public AdmissionApplication createApplication(Authentication authentication, ApplicationCreateRequest request) {
         AppUser user = currentUser(authentication);
         Speciality speciality = specialityRepository.findById(request.specialityId())
-            .orElseThrow(() -> new IllegalArgumentException("Направление не найдено"));
+            .orElseThrow(() -> new IllegalArgumentException("Специальность не найдена"));
 
         AdmissionApplication application = new AdmissionApplication();
         application.setApplicant(user);

@@ -104,7 +104,14 @@ const emptyApplication = {
   applicantComment: '',
 };
 
+const emptyDepartment = {
+  code: '',
+  name: '',
+  description: '',
+};
+
 const emptySpeciality = {
+  departmentId: '',
   code: '',
   name: '',
   description: '',
@@ -134,15 +141,18 @@ function App() {
   const [registerForm, setRegisterForm] = useState(emptyRegister);
   const [profileForm, setProfileForm] = useState(emptyProfile);
   const [applicationForm, setApplicationForm] = useState(emptyApplication);
+  const [departmentForm, setDepartmentForm] = useState(emptyDepartment);
   const [specialityForm, setSpecialityForm] = useState(emptySpeciality);
   const [userForm, setUserForm] = useState(emptyUser);
 
+  const [publicDepartments, setPublicDepartments] = useState([]);
   const [publicSpecialities, setPublicSpecialities] = useState([]);
   const [publicDashboard, setPublicDashboard] = useState(null);
   const [applicantApplications, setApplicantApplications] = useState([]);
   const [staffApplications, setStaffApplications] = useState([]);
   const [staffFilter, setStaffFilter] = useState('ALL');
   const [adminUsers, setAdminUsers] = useState([]);
+  const [adminDepartments, setAdminDepartments] = useState([]);
   const [adminSpecialities, setAdminSpecialities] = useState([]);
   const [adminDashboard, setAdminDashboard] = useState(null);
 
@@ -150,13 +160,20 @@ function App() {
   const [selectedStaffApplicationId, setSelectedStaffApplicationId] = useState('');
   const [selectedSpecialityId, setSelectedSpecialityId] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
   const [creatingSpeciality, setCreatingSpeciality] = useState(false);
+  const [creatingDepartment, setCreatingDepartment] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
   const [activeSection, setActiveSection] = useState('');
 
   const loadPublic = useCallback(async () => {
     try {
-      const [specialities, dashboard] = await Promise.all([api.publicSpecialities(), api.publicDashboard()]);
+      const [departments, specialities, dashboard] = await Promise.all([
+        api.publicDepartments(),
+        api.publicSpecialities(),
+        api.publicDashboard(),
+      ]);
+      setPublicDepartments(departments);
       setPublicSpecialities(specialities);
       setPublicDashboard(dashboard);
     } catch (nextError) {
@@ -186,14 +203,17 @@ function App() {
         }
 
         if (nextAuth.user.role === 'ADMIN') {
-          const [dashboard, specialities, users] = await Promise.all([
+          const [dashboard, departments, specialities, users] = await Promise.all([
             api.adminDashboard(nextAuth.token),
+            api.adminDepartments(nextAuth.token),
             api.adminSpecialities(nextAuth.token),
             api.adminUsers(nextAuth.token),
           ]);
           setAdminDashboard(dashboard);
+          setAdminDepartments(departments);
           setAdminSpecialities(specialities);
           setAdminUsers(users);
+          setSelectedDepartmentId((current) => current || `${departments[0]?.id || ''}`);
           setSelectedSpecialityId((current) => current || `${specialities[0]?.id || ''}`);
           setSelectedUserId((current) => current || `${users[0]?.id || ''}`);
         }
@@ -209,7 +229,12 @@ function App() {
 
     (async () => {
       try {
-        const [specialities, dashboard] = await Promise.all([api.publicSpecialities(), api.publicDashboard()]);
+        const [departments, specialities, dashboard] = await Promise.all([
+          api.publicDepartments(),
+          api.publicSpecialities(),
+          api.publicDashboard(),
+        ]);
+        setPublicDepartments(departments);
         setPublicSpecialities(specialities);
         setPublicDashboard(dashboard);
 
@@ -240,14 +265,17 @@ function App() {
         }
 
         if (me.user.role === 'ADMIN') {
-          const [adminDashboardData, specialitiesData, usersData] = await Promise.all([
+          const [adminDashboardData, departmentsData, specialitiesData, usersData] = await Promise.all([
             api.adminDashboard(nextAuth.token),
+            api.adminDepartments(nextAuth.token),
             api.adminSpecialities(nextAuth.token),
             api.adminUsers(nextAuth.token),
           ]);
           setAdminDashboard(adminDashboardData);
+          setAdminDepartments(departmentsData);
           setAdminSpecialities(specialitiesData);
           setAdminUsers(usersData);
+          setSelectedDepartmentId(`${departmentsData[0]?.id || ''}`);
           setSelectedSpecialityId(`${specialitiesData[0]?.id || ''}`);
           setSelectedUserId(`${usersData[0]?.id || ''}`);
         }
@@ -341,6 +369,11 @@ function App() {
     [adminUsers, selectedUserId],
   );
 
+  const selectedDepartment = useMemo(
+    () => adminDepartments.find((item) => `${item.id}` === `${selectedDepartmentId}`) || null,
+    [adminDepartments, selectedDepartmentId],
+  );
+
   const navigationTabs = useMemo(() => {
     if (!auth) {
       return [];
@@ -352,17 +385,20 @@ function App() {
           { value: 'profile', label: 'Профиль', icon: <Person fontSize="small" /> },
           { value: 'applications', label: 'Заявки', icon: <Assignment fontSize="small" /> },
           { value: 'documents', label: 'Документы', icon: <Description fontSize="small" /> },
-          { value: 'specialities', label: 'Направления', icon: <School fontSize="small" /> },
+          { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
+          { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
         ];
       case 'STAFF':
         return [
           { value: 'queue', label: 'Очередь', icon: <AssignmentTurnedIn fontSize="small" /> },
-          { value: 'specialities', label: 'Направления', icon: <School fontSize="small" /> },
+          { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
+          { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
         ];
       case 'ADMIN':
         return [
           { value: 'dashboard', label: 'Сводка', icon: <Dashboard fontSize="small" /> },
-          { value: 'specialities', label: 'Направления', icon: <School fontSize="small" /> },
+          { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
+          { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
           { value: 'users', label: 'Пользователи', icon: <AdminPanelSettings fontSize="small" /> },
         ];
       default:
@@ -429,12 +465,15 @@ function App() {
     setApplicantApplications([]);
     setStaffApplications([]);
     setAdminUsers([]);
+    setAdminDepartments([]);
     setAdminSpecialities([]);
     setAdminDashboard(null);
+    setPublicDepartments([]);
     setSelectedApplicantApplicationId('');
     setSelectedStaffApplicationId('');
     setSelectedSpecialityId('');
     setSelectedUserId('');
+    setSelectedDepartmentId('');
     setMessage('Сеанс завершён');
     await loadPublic();
   }
@@ -580,6 +619,7 @@ function App() {
     try {
       const payload = {
         ...specialityForm,
+        departmentId: Number(specialityForm.departmentId),
         budgetPlaces: Number(specialityForm.budgetPlaces),
         paidPlaces: Number(specialityForm.paidPlaces),
         admissionPlan: Number(specialityForm.admissionPlan),
@@ -587,10 +627,10 @@ function App() {
       let saved;
       if (selectedAdminSpeciality) {
         saved = await api.adminUpdateSpeciality(auth.token, selectedAdminSpeciality.id, payload);
-        setMessage('Направление обновлено');
+        setMessage('Специальность обновлена');
       } else {
         saved = await api.adminCreateSpeciality(auth.token, payload);
-        setMessage('Направление создано');
+        setMessage('Специальность создана');
       }
       setCreatingSpeciality(false);
       const specialities = await api.adminSpecialities(auth.token);
@@ -598,6 +638,7 @@ function App() {
       if (saved) {
         setSelectedSpecialityId(`${saved.id}`);
         setSpecialityForm({
+          departmentId: `${saved.department?.id || ''}`,
           code: saved.code,
           name: saved.name,
           description: saved.description || '',
@@ -618,7 +659,7 @@ function App() {
 
     try {
       await api.adminDeleteSpeciality(auth.token, selectedAdminSpeciality.id);
-      setMessage('Направление удалено');
+      setMessage('Специальность удалена');
       const specialities = await api.adminSpecialities(auth.token);
       setAdminSpecialities(specialities);
       if (specialities.length > 0) {
@@ -626,6 +667,7 @@ function App() {
         setCreatingSpeciality(false);
         setSelectedSpecialityId(`${first.id}`);
         setSpecialityForm({
+          departmentId: `${first.department?.id || ''}`,
           code: first.code,
           name: first.name,
           description: first.description || '',
@@ -699,6 +741,7 @@ function App() {
     setCreatingSpeciality(false);
     setSelectedSpecialityId(`${speciality.id}`);
     setSpecialityForm({
+      departmentId: `${speciality.department?.id || ''}`,
       code: speciality.code,
       name: speciality.name,
       description: speciality.description || '',
@@ -725,7 +768,89 @@ function App() {
   function startNewSpeciality() {
     setCreatingSpeciality(true);
     setSelectedSpecialityId('');
-    setSpecialityForm(emptySpeciality);
+    setSpecialityForm({
+      ...emptySpeciality,
+      departmentId: selectedDepartment?.id ? `${selectedDepartment.id}` : `${adminDepartments[0]?.id || ''}`,
+    });
+  }
+
+  async function handleDepartmentSave(event) {
+    event.preventDefault();
+    if (!auth || auth.user.role !== 'ADMIN') return;
+    setError('');
+    setMessage('');
+
+    try {
+      const payload = {
+        ...departmentForm,
+      };
+      let saved;
+      if (selectedDepartment) {
+        saved = await api.adminUpdateDepartment(auth.token, selectedDepartment.id, payload);
+        setMessage('Отделение обновлено');
+      } else {
+        saved = await api.adminCreateDepartment(auth.token, payload);
+        setMessage('Отделение создано');
+      }
+      setCreatingDepartment(false);
+      const departments = await api.adminDepartments(auth.token);
+      setAdminDepartments(departments);
+      if (saved) {
+        setSelectedDepartmentId(`${saved.id}`);
+        setDepartmentForm({
+          code: saved.code,
+          name: saved.name,
+          description: saved.description || '',
+        });
+      }
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  }
+
+  async function handleDeleteDepartment() {
+    if (!auth || !selectedDepartment) return;
+    setError('');
+    setMessage('');
+
+    try {
+      await api.adminDeleteDepartment(auth.token, selectedDepartment.id);
+      setMessage('Отделение удалено');
+      const departments = await api.adminDepartments(auth.token);
+      setAdminDepartments(departments);
+      if (departments.length > 0) {
+        const first = departments[0];
+        setCreatingDepartment(false);
+        setSelectedDepartmentId(`${first.id}`);
+        setDepartmentForm({
+          code: first.code,
+          name: first.name,
+          description: first.description || '',
+        });
+      } else {
+        setCreatingDepartment(false);
+        setSelectedDepartmentId('');
+        setDepartmentForm(emptyDepartment);
+      }
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  }
+
+  function selectDepartmentForEditing(department) {
+    setCreatingDepartment(false);
+    setSelectedDepartmentId(`${department.id}`);
+    setDepartmentForm({
+      code: department.code,
+      name: department.name,
+      description: department.description || '',
+    });
+  }
+
+  function startNewDepartment() {
+    setCreatingDepartment(true);
+    setSelectedDepartmentId('');
+    setDepartmentForm(emptyDepartment);
   }
 
   function startNewUser() {
@@ -734,7 +859,8 @@ function App() {
     setUserForm(emptyUser);
   }
 
-  const primaryActionLabel = selectedAdminSpeciality && !creatingSpeciality ? 'Сохранить направление' : 'Создать направление';
+  const primaryActionLabel = selectedAdminSpeciality && !creatingSpeciality ? 'Сохранить специальность' : 'Создать специальность';
+  const departmentActionLabel = selectedDepartment && !creatingDepartment ? 'Сохранить отделение' : 'Создать отделение';
   const userActionLabel = selectedAdminUser && !creatingUser ? 'Сохранить пользователя' : 'Создать пользователя';
 
   return (
@@ -885,14 +1011,15 @@ function App() {
                       <FeatureCard
                         icon={<AdminPanelSettings fontSize="small" />}
                         title="Администратор"
-                        text="Управляет пользователями, направлениями и видит общую аналитику приемной кампании."
+                        text="Управляет пользователями, отделениями, специальностями и видит общую аналитику приемной кампании."
                       />
                     </Grid>
 
                     <Divider />
 
                     <Grid container spacing={2}>
-                      <MetricCard label="Направлений" value={publicSpecialities.length} />
+                      <MetricCard label="Отделений" value={publicDepartments.length} />
+                      <MetricCard label="Специальностей" value={publicSpecialities.length} />
                       <MetricCard label="Заявок" value={publicDashboard?.totalApplications || 0} />
                       <MetricCard label="На проверке" value={publicDashboard?.underReview || 0} />
                     </Grid>
@@ -1014,7 +1141,7 @@ function App() {
                   <Grid item xs={12} md={7}>
                     <Grid container spacing={2}>
                       <MetricCard label="Моя роль" value={ROLE_LABELS[auth.user.role]} />
-                      <MetricCard label="Направлений" value={publicSpecialities.length} />
+                      <MetricCard label="Специальностей" value={publicSpecialities.length} />
                       <MetricCard label="Заявок" value={publicDashboard?.totalApplications || 0} />
                     </Grid>
                   </Grid>
@@ -1036,6 +1163,7 @@ function App() {
               handleSaveProfile,
               applicationForm,
               setApplicationForm,
+              publicDepartments,
               publicSpecialities,
               applicantApplications,
               selectedApplicantApplication,
@@ -1063,6 +1191,15 @@ function App() {
               handleSpecialitySave,
               handleDeleteSpeciality,
               primaryActionLabel,
+              departmentForm,
+              setDepartmentForm,
+              selectedDepartment,
+              selectDepartmentForEditing,
+              startNewDepartment,
+              handleDepartmentSave,
+              handleDeleteDepartment,
+              departmentActionLabel,
+              adminDepartments,
               userForm,
               setUserForm,
               selectedAdminUser,
@@ -1092,29 +1229,41 @@ function renderActiveSection(props) {
           return <ApplicantApplicationsSection {...props} />;
         case 'documents':
           return <ApplicantDocumentsSection {...props} />;
+        case 'departments':
+          return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
         case 'specialities':
-          return <SpecialitiesDirectorySection publicSpecialities={props.publicSpecialities} />;
+          return <SpecialitiesDirectorySection departments={props.publicDepartments} publicSpecialities={props.publicSpecialities} />;
         case 'profile':
         default:
           return <ApplicantProfileSection {...props} />;
       }
     case 'STAFF':
       switch (activeSection) {
+        case 'departments':
+          return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
         case 'specialities':
-          return <SpecialitiesDirectorySection publicSpecialities={props.publicSpecialities} />;
+          return <SpecialitiesDirectorySection departments={props.publicDepartments} publicSpecialities={props.publicSpecialities} />;
         case 'queue':
         default:
           return <StaffQueueSection {...props} />;
       }
     case 'ADMIN':
       switch (activeSection) {
+        case 'departments':
+          return <AdminDepartmentsSection {...props} />;
         case 'specialities':
           return <AdminSpecialitiesSection {...props} />;
         case 'users':
           return <AdminUsersSection {...props} />;
         case 'dashboard':
         default:
-          return <AdminDashboardSection {...props} />;
+          return (
+            <AdminDashboardSection
+              adminDashboard={props.adminDashboard}
+              adminDepartments={props.adminDepartments}
+              adminSpecialities={props.adminSpecialities}
+            />
+          );
       }
     default:
       return null;
@@ -1184,12 +1333,12 @@ function ApplicantApplicationsSection({
             <Stack component="form" spacing={2} onSubmit={handleCreateApplication}>
               <TextField
                 select
-                label="Направление"
+                label="Специальность"
                 value={applicationForm.specialityId}
                 onChange={(event) => setApplicationForm({ ...applicationForm, specialityId: event.target.value })}
                 fullWidth
               >
-                <MenuItem value="">Выберите направление</MenuItem>
+                <MenuItem value="">Выберите специальность</MenuItem>
                 {publicSpecialities.map((speciality) => (
                   <MenuItem key={speciality.id} value={speciality.id}>
                     {speciality.code} · {speciality.name}
@@ -1421,11 +1570,47 @@ function ApplicantDocumentsSection({ selectedApplicantApplication, handleDownloa
   );
 }
 
-function SpecialitiesDirectorySection({ publicSpecialities }) {
+function DepartmentDirectorySection({ departments, specialities }) {
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardContent sx={{ p: 3 }}>
-        <SectionHeader title="Направления" text="Данные используются и в заявках, и в отчетах." />
+        <SectionHeader title="Отделения" text="Каждое отделение объединяет связанные специальности и учебные программы." />
+        <Grid container spacing={2}>
+          {departments.map((department) => (
+            <Grid item xs={12} sm={6} lg={4} key={department.id}>
+              <Card variant="outlined" sx={{ height: '100%', borderRadius: 2.5, bgcolor: alpha('#fff', 0.9) }}>
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                      <Chip label={department.code} size="small" />
+                      <Chip
+                        label={`${specialities.filter((item) => item.department?.id === department.id).length} спец.`}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Stack>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {department.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {department.description}
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SpecialitiesDirectorySection({ departments, publicSpecialities }) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <SectionHeader title="Специальности" text="Данные используются и в заявках, и в отчетах." />
         <Grid container spacing={2}>
           {publicSpecialities.map((speciality) => (
             <Grid item xs={12} sm={6} lg={4} key={speciality.id}>
@@ -1433,7 +1618,8 @@ function SpecialitiesDirectorySection({ publicSpecialities }) {
                 <CardContent>
                   <Stack spacing={1.5}>
                     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                      <Chip label={speciality.code} size="small" />
+                      <Chip label={speciality.department?.name || 'Без отделения'} size="small" />
+                      <Chip label={speciality.code} size="small" variant="outlined" />
                       <Chip label={`${speciality.admissionPlan} мест`} size="small" variant="outlined" />
                     </Stack>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -1532,7 +1718,10 @@ function StaffQueueSection({
                       </Stack>
 
                       <Grid container spacing={2}>
-                        <InfoTile label="Направление" value={`${selectedStaffApplication.speciality.code} · ${selectedStaffApplication.speciality.name}`} />
+                        <InfoTile
+                          label="Специальность"
+                          value={`${selectedStaffApplication.speciality.code} · ${selectedStaffApplication.speciality.name}`}
+                        />
                         <InfoTile label="Почта" value={selectedStaffApplication.applicant.email} />
                         <InfoTile label="Телефон" value={selectedStaffApplication.applicant.phone} />
                         <InfoTile label="Дата подачи" value={formatDate(selectedStaffApplication.createdAt)} />
@@ -1597,18 +1786,20 @@ function StaffQueueSection({
   );
 }
 
-function AdminDashboardSection({ adminDashboard }) {
+function AdminDashboardSection({ adminDashboard, adminDepartments, adminSpecialities }) {
   return (
     <Stack spacing={3}>
       <Card variant="outlined" sx={{ borderRadius: 3 }}>
         <CardContent sx={{ p: 3 }}>
           <SectionHeader
             title="Админ-панель"
-            text="Управление направлениями, пользователями и общей статистикой приемной комиссии."
+            text="Управление отделениями, специальностями, пользователями и общей статистикой приемной комиссии."
           />
           <Grid container spacing={2}>
             <MetricCard label="Пользователей" value={adminDashboard?.totalUsers || 0} />
             <MetricCard label="Абитуриентов" value={adminDashboard?.totalApplicants || 0} />
+            <MetricCard label="Отделений" value={adminDepartments?.length || 0} />
+            <MetricCard label="Специальностей" value={adminSpecialities?.length || 0} />
             <MetricCard label="Заявок" value={adminDashboard?.totalApplications || 0} />
           </Grid>
         </CardContent>
@@ -1617,7 +1808,106 @@ function AdminDashboardSection({ adminDashboard }) {
   );
 }
 
+function AdminDepartmentsSection({
+  adminDepartments,
+  departmentForm,
+  setDepartmentForm,
+  selectedDepartment,
+  selectDepartmentForEditing,
+  startNewDepartment,
+  handleDepartmentSave,
+  handleDeleteDepartment,
+  departmentActionLabel,
+}) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
+          <SectionHeader
+            title="Отделения"
+            text="Создавайте отделения, а затем привязывайте к ним специальности."
+          />
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Button variant="outlined" startIcon={<Add />} onClick={startNewDepartment}>
+              Новое отделение
+            </Button>
+          </Stack>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={5}>
+              <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                {adminDepartments.map((department) => (
+                  <ListItemButton
+                    key={department.id}
+                    selected={selectedDepartment?.id === department.id}
+                    onClick={() => selectDepartmentForEditing(department)}
+                    sx={{ alignItems: 'flex-start', py: 1.5 }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          {department.code}
+                        </Typography>
+                      }
+                      secondary={department.name}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Grid>
+
+            <Grid item xs={12} md={7}>
+              <Stack component="form" spacing={2} onSubmit={handleDepartmentSave}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Код"
+                      value={departmentForm.code}
+                      onChange={(event) => setDepartmentForm({ ...departmentForm, code: event.target.value })}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Название"
+                      value={departmentForm.name}
+                      onChange={(event) => setDepartmentForm({ ...departmentForm, name: event.target.value })}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Описание"
+                      value={departmentForm.description}
+                      onChange={(event) => setDepartmentForm({ ...departmentForm, description: event.target.value })}
+                      multiline
+                      minRows={4}
+                      fullWidth
+                    />
+                  </Grid>
+                </Grid>
+
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <Button type="submit" variant="contained">
+                    {departmentActionLabel}
+                  </Button>
+                  {selectedDepartment ? (
+                    <Button type="button" color="error" variant="outlined" onClick={handleDeleteDepartment} startIcon={<DeleteOutline />}>
+                      Удалить отделение
+                    </Button>
+                  ) : null}
+                </Stack>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AdminSpecialitiesSection({
+  adminDepartments,
   adminSpecialities,
   specialityForm,
   setSpecialityForm,
@@ -1633,12 +1923,12 @@ function AdminSpecialitiesSection({
       <CardContent sx={{ p: 3 }}>
         <Stack spacing={2.5}>
           <SectionHeader
-            title="Направления"
-            text="Создавайте и редактируйте учебные программы для приемной кампании."
+            title="Специальности"
+            text="Создавайте и редактируйте специальности внутри отделений."
           />
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             <Button variant="outlined" startIcon={<Add />} onClick={startNewSpeciality}>
-              Новое направление
+              Новая специальность
             </Button>
           </Stack>
 
@@ -1652,25 +1942,41 @@ function AdminSpecialitiesSection({
                     onClick={() => selectSpecialityForEditing(speciality)}
                     sx={{ alignItems: 'flex-start', py: 1.5 }}
                   >
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          {speciality.code}
-                        </Typography>
-                      }
-                      secondary={speciality.name}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
-            </Grid>
+                          <ListItemText
+                            primary={
+                              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                {speciality.code}
+                              </Typography>
+                            }
+                            secondary={`${speciality.department?.name || 'Без отделения'} · ${speciality.name}`}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </Grid>
 
-            <Grid item xs={12} md={7}>
-              <Stack component="form" spacing={2} onSubmit={handleSpecialitySave}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Код"
+                  <Grid item xs={12} md={7}>
+                    <Stack component="form" spacing={2} onSubmit={handleSpecialitySave}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <TextField
+                            select
+                            label="Отделение"
+                            value={specialityForm.departmentId}
+                            onChange={(event) => setSpecialityForm({ ...specialityForm, departmentId: event.target.value })}
+                            fullWidth
+                          >
+                            <MenuItem value="">Выберите отделение</MenuItem>
+                            {adminDepartments.map((department) => (
+                              <MenuItem key={department.id} value={department.id}>
+                                {department.code} · {department.name}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            label="Код"
                       value={specialityForm.code}
                       onChange={(event) => setSpecialityForm({ ...specialityForm, code: event.target.value })}
                       fullWidth
@@ -1729,7 +2035,7 @@ function AdminSpecialitiesSection({
                   </Button>
                   {selectedAdminSpeciality ? (
                     <Button type="button" color="error" variant="outlined" onClick={handleDeleteSpeciality} startIcon={<DeleteOutline />}>
-                      Удалить направление
+                      Удалить специальность
                     </Button>
                   ) : null}
                 </Stack>

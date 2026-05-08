@@ -4,6 +4,7 @@ import java.time.Instant;
 
 public record SpecialityResponse(
     Long id,
+    DepartmentResponse department,
     String code,
     String name,
     String description,

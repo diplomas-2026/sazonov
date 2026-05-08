@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
 public record SpecialityUpsertRequest(
+    @NotNull Long departmentId,
     @NotBlank String code,
     @NotBlank String name,
     String description,

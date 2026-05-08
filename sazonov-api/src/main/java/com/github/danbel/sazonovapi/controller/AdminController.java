@@ -2,6 +2,8 @@ package com.github.danbel.sazonovapi.controller;
 
 import com.github.danbel.sazonovapi.domain.AppUser;
 import com.github.danbel.sazonovapi.dto.DashboardResponse;
+import com.github.danbel.sazonovapi.dto.DepartmentResponse;
+import com.github.danbel.sazonovapi.dto.DepartmentUpsertRequest;
 import com.github.danbel.sazonovapi.dto.SpecialityResponse;
 import com.github.danbel.sazonovapi.dto.SpecialityUpsertRequest;
 import com.github.danbel.sazonovapi.dto.UserCreateRequest;
@@ -10,6 +12,7 @@ import com.github.danbel.sazonovapi.dto.UserUpdateRequest;
 import com.github.danbel.sazonovapi.service.ApiMapper;
 import com.github.danbel.sazonovapi.service.AuthService;
 import com.github.danbel.sazonovapi.service.DashboardService;
+import com.github.danbel.sazonovapi.service.DepartmentService;
 import com.github.danbel.sazonovapi.service.SpecialityService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,12 +34,33 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final SpecialityService specialityService;
+    private final DepartmentService departmentService;
     private final AuthService authService;
     private final DashboardService dashboardService;
 
     @GetMapping("/dashboard")
     public DashboardResponse dashboard() {
         return dashboardService.getDashboard();
+    }
+
+    @GetMapping("/departments")
+    public List<DepartmentResponse> departments() {
+        return departmentService.list().stream().map(ApiMapper::departmentResponse).toList();
+    }
+
+    @PostMapping("/departments")
+    public DepartmentResponse createDepartment(@Valid @RequestBody DepartmentUpsertRequest request) {
+        return ApiMapper.departmentResponse(departmentService.create(request));
+    }
+
+    @PutMapping("/departments/{id}")
+    public DepartmentResponse updateDepartment(@PathVariable Long id, @Valid @RequestBody DepartmentUpsertRequest request) {
+        return ApiMapper.departmentResponse(departmentService.update(id, request));
+    }
+
+    @DeleteMapping("/departments/{id}")
+    public void deleteDepartment(@PathVariable Long id) {
+        departmentService.delete(id);
     }
 
     @GetMapping("/specialities")

@@ -2,10 +2,12 @@ package com.github.danbel.sazonovapi.service;
 
 import com.github.danbel.sazonovapi.domain.AdmissionApplication;
 import com.github.danbel.sazonovapi.domain.ApplicationDocument;
+import com.github.danbel.sazonovapi.domain.Department;
 import com.github.danbel.sazonovapi.domain.AppUser;
 import com.github.danbel.sazonovapi.domain.Speciality;
 import com.github.danbel.sazonovapi.dto.ApplicationDocumentResponse;
 import com.github.danbel.sazonovapi.dto.ApplicationResponse;
+import com.github.danbel.sazonovapi.dto.DepartmentResponse;
 import com.github.danbel.sazonovapi.dto.SpecialityResponse;
 import com.github.danbel.sazonovapi.dto.SpecialityStatsResponse;
 import com.github.danbel.sazonovapi.dto.UserResponse;
@@ -32,6 +34,7 @@ public final class ApiMapper {
     public static SpecialityResponse specialityResponse(Speciality speciality) {
         return new SpecialityResponse(
             speciality.getId(),
+            departmentResponse(speciality.getDepartment()),
             speciality.getCode(),
             speciality.getName(),
             speciality.getDescription(),
@@ -39,6 +42,16 @@ public final class ApiMapper {
             speciality.getPaidPlaces(),
             speciality.getAdmissionPlan(),
             speciality.getCreatedAt()
+        );
+    }
+
+    public static DepartmentResponse departmentResponse(Department department) {
+        return new DepartmentResponse(
+            department.getId(),
+            department.getCode(),
+            department.getName(),
+            department.getDescription(),
+            department.getCreatedAt()
         );
     }
 
@@ -84,6 +97,9 @@ public final class ApiMapper {
             speciality.getId(),
             speciality.getCode(),
             speciality.getName(),
+            speciality.getDepartment().getId(),
+            speciality.getDepartment().getCode(),
+            speciality.getDepartment().getName(),
             applications
         );
     }

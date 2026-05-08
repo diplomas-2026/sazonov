@@ -67,6 +67,7 @@ export const api = {
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
   me: (token) => request('/auth/me', { token }),
   updateMe: (token, payload) => request('/auth/me', { token, method: 'PUT', body: payload }),
+  publicDepartments: () => request('/public/departments'),
   publicSpecialities: () => request('/public/specialities'),
   publicDashboard: () => request('/public/dashboard'),
   applicantApplications: (token) => request('/applicant/applications', { token }),
@@ -93,6 +94,13 @@ export const api = {
     request(`/staff/applications/${id}/status`, { token, method: 'PATCH', body: payload }),
   staffApplication: (token, id) => request(`/staff/applications/${id}`, { token }),
   adminDashboard: (token) => request('/admin/dashboard', { token }),
+  adminDepartments: (token) => request('/admin/departments', { token }),
+  adminCreateDepartment: (token, payload) =>
+    request('/admin/departments', { token, method: 'POST', body: payload }),
+  adminUpdateDepartment: (token, id, payload) =>
+    request(`/admin/departments/${id}`, { token, method: 'PUT', body: payload }),
+  adminDeleteDepartment: (token, id) =>
+    request(`/admin/departments/${id}`, { token, method: 'DELETE' }),
   adminSpecialities: (token) => request('/admin/specialities', { token }),
   adminCreateSpeciality: (token, payload) =>
     request('/admin/specialities', { token, method: 'POST', body: payload }),

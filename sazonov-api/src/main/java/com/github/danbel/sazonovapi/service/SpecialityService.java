@@ -2,6 +2,7 @@ package com.github.danbel.sazonovapi.service;
 
 import com.github.danbel.sazonovapi.domain.Speciality;
 import com.github.danbel.sazonovapi.dto.SpecialityUpsertRequest;
+import com.github.danbel.sazonovapi.repository.DepartmentRepository;
 import com.github.danbel.sazonovapi.repository.SpecialityRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SpecialityService {
 
     private final SpecialityRepository specialityRepository;
+    private final DepartmentRepository departmentRepository;
 
     public List<Speciality> list() {
         return specialityRepository.findAll().stream()
@@ -29,7 +31,7 @@ public class SpecialityService {
 
     public Speciality update(Long id, SpecialityUpsertRequest request) {
         Speciality speciality = specialityRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Направление не найдено"));
+            .orElseThrow(() -> new IllegalArgumentException("Специальность не найдена"));
         apply(speciality, request);
         return specialityRepository.save(speciality);
     }
@@ -39,6 +41,8 @@ public class SpecialityService {
     }
 
     private void apply(Speciality speciality, SpecialityUpsertRequest request) {
+        speciality.setDepartment(departmentRepository.findById(request.departmentId())
+            .orElseThrow(() -> new IllegalArgumentException("Отделение не найдено")));
         speciality.setCode(request.code());
         speciality.setName(request.name());
         speciality.setDescription(request.description());

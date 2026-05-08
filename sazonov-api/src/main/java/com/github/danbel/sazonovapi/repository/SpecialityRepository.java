@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface SpecialityRepository extends JpaRepository<Speciality, Long> {
 
     Optional<Speciality> findByCode(String code);
+
+    long countByDepartmentId(Long departmentId);
 }
