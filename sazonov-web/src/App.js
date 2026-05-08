@@ -12,6 +12,7 @@ import {
   Container,
   Divider,
   Grid,
+  InputAdornment,
   List,
   ListItemButton,
   ListItemText,
@@ -38,10 +39,12 @@ import {
   Login,
   Logout,
   ManageAccounts,
+  Search,
   Refresh,
   Assignment,
   Person,
   School,
+  Sort,
 } from '@mui/icons-material';
 import './App.css';
 import { api, clearStoredAuth, loadStoredAuth, saveStoredAuth } from './api';
@@ -87,6 +90,53 @@ const REQUIRED_APPLICATION_DOCUMENTS = [
 ];
 
 const KANBAN_STATUSES = ['SUBMITTED', 'UNDER_REVIEW', 'MISSING_DOCS', 'ACCEPTED', 'REJECTED', 'CANCELLED'];
+
+const APPLICATION_SORT_OPTIONS = [
+  { value: 'newest', label: 'Сначала новые' },
+  { value: 'oldest', label: 'Сначала старые' },
+  { value: 'points_desc', label: 'По баллу: больше к меньшему' },
+  { value: 'points_asc', label: 'По баллу: меньше к большему' },
+  { value: 'name_asc', label: 'По ФИО: А-Я' },
+];
+
+const APPLICATION_STATUS_FILTER_OPTIONS = [
+  { value: 'ALL', label: 'Все статусы' },
+  ...KANBAN_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
+];
+
+function getApplicationSearchText(application) {
+  return [
+    application.id,
+    application.status,
+    STATUS_LABELS[application.status],
+    application.applicant?.fullName,
+    application.speciality?.department?.name,
+    application.speciality?.code,
+    application.speciality?.name,
+    application.staffComment,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function sortApplications(items, sortMode) {
+  const sorted = [...items];
+
+  switch (sortMode) {
+    case 'oldest':
+      return sorted.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    case 'points_desc':
+      return sorted.sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
+    case 'points_asc':
+      return sorted.sort((a, b) => Number(a.points || 0) - Number(b.points || 0));
+    case 'name_asc':
+      return sorted.sort((a, b) => `${a.applicant?.fullName || ''}`.localeCompare(`${b.applicant?.fullName || ''}`, 'ru'));
+    case 'newest':
+    default:
+      return sorted.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }
+}
 
 const emptyLogin = {
   username: 'admin',
@@ -189,6 +239,9 @@ function App() {
   const [creatingUser, setCreatingUser] = useState(false);
   const [activeSection, setActiveSection] = useState('');
   const [authView, setAuthView] = useState('home');
+  const [applicationSearchQuery, setApplicationSearchQuery] = useState('');
+  const [applicationSortMode, setApplicationSortMode] = useState('newest');
+  const [applicationStatusFilter, setApplicationStatusFilter] = useState('ALL');
   const [savingApplicationEdit, setSavingApplicationEdit] = useState(false);
   const [cancellingApplication, setCancellingApplication] = useState(false);
   const [updatingApplicationId, setUpdatingApplicationId] = useState('');
@@ -573,6 +626,9 @@ function App() {
     setSelectedDepartmentId('');
     setSavingApplicationEdit(false);
     setCancellingApplication(false);
+    setApplicationSearchQuery('');
+    setApplicationSortMode('newest');
+    setApplicationStatusFilter('ALL');
     setMessage('Сеанс завершён');
     await loadPublic();
   }
@@ -1248,6 +1304,12 @@ function App() {
               updatingApplicationId,
               authView,
               setAuthView,
+              applicationSearchQuery,
+              setApplicationSearchQuery,
+              applicationSortMode,
+              setApplicationSortMode,
+              applicationStatusFilter,
+              setApplicationStatusFilter,
             })}
           </Stack>
         )}
@@ -1576,7 +1638,30 @@ function ApplicantApplicationsSection({
   selectedApplicantApplication,
   setSelectedApplicantApplicationId,
   setActiveSection,
+  applicationSearchQuery,
+  setApplicationSearchQuery,
+  applicationSortMode,
+  setApplicationSortMode,
+  applicationStatusFilter,
+  setApplicationStatusFilter,
 }) {
+  const visibleApplications = useMemo(() => {
+    const query = applicationSearchQuery.trim().toLowerCase();
+    let items = applicantApplications.filter((application) => {
+      if (applicationStatusFilter !== 'ALL' && application.status !== applicationStatusFilter) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return getApplicationSearchText(application).includes(query);
+    });
+
+    return sortApplications(items, applicationSortMode);
+  }, [applicantApplications, applicationSearchQuery, applicationSortMode, applicationStatusFilter]);
+
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardContent sx={{ p: 3 }}>
@@ -1591,8 +1676,20 @@ function ApplicantApplicationsSection({
             </Button>
           </Stack>
 
+          <ApplicationsFiltersBar
+            searchValue={applicationSearchQuery}
+            onSearchChange={setApplicationSearchQuery}
+            sortValue={applicationSortMode}
+            onSortChange={setApplicationSortMode}
+            statusValue={applicationStatusFilter}
+            onStatusChange={setApplicationStatusFilter}
+            showStatusFilter
+            statusFilterLabel="Фильтр по статусу"
+            helperText="Поиск работает по ФИО, специальности, отделению, статусу и номеру заявки."
+          />
+
           <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-            {applicantApplications.map((application) => (
+            {visibleApplications.map((application) => (
               <ListItemButton
                 key={application.id}
                 selected={selectedApplicantApplication?.id === application.id}
@@ -1615,9 +1712,16 @@ function ApplicantApplicationsSection({
                 />
               </ListItemButton>
             ))}
-            {!applicantApplications.length ? (
+            {!visibleApplications.length ? (
               <Box sx={{ p: 2 }}>
-                <EmptyState title="Заявок пока нет" text="Нажмите «Создать заявку», чтобы отправить первое заявление." />
+                <EmptyState
+                  title={applicantApplications.length ? 'Ничего не найдено' : 'Заявок пока нет'}
+                  text={
+                    applicantApplications.length
+                      ? 'Попробуйте изменить поиск, сортировку или фильтр по статусу.'
+                      : 'Нажмите «Создать заявку», чтобы отправить первое заявление.'
+                  }
+                />
               </Box>
             ) : null}
           </List>
@@ -2651,21 +2755,39 @@ function SpecialitiesDirectorySection({ departments, publicSpecialities }) {
 }
 
 function StaffQueueSection({
-  auth,
   applications,
   selectedStaffApplication,
   setSelectedStaffApplicationId,
   setActiveSection,
   updateApplicationStatus,
   updatingApplicationId,
+  applicationSearchQuery,
+  setApplicationSearchQuery,
+  applicationSortMode,
+  setApplicationSortMode,
 }) {
   const [draggedApplicationId, setDraggedApplicationId] = useState('');
   const groupedApplications = useMemo(() => {
     return KANBAN_STATUSES.reduce((acc, status) => {
-      acc[status] = applications.filter((application) => application.status === status);
+      acc[status] = applications
+        .filter((application) => application.status === status)
+        .filter((application) => {
+          const query = applicationSearchQuery.trim().toLowerCase();
+          if (!query) {
+            return true;
+          }
+          return getApplicationSearchText(application).includes(query);
+        });
+
+      acc[status] = sortApplications(acc[status], applicationSortMode);
       return acc;
     }, {});
-  }, [applications]);
+  }, [applications, applicationSearchQuery, applicationSortMode]);
+
+  const visibleApplicationsCount = useMemo(
+    () => Object.values(groupedApplications).reduce((sum, items) => sum + items.length, 0),
+    [groupedApplications],
+  );
 
   function handleDragStart(applicationId) {
     if (updatingApplicationId) {
@@ -2695,6 +2817,24 @@ function StaffQueueSection({
             title="Канбан заявок"
             text="Перетаскивайте карточки между колонками статусов. Клик по карточке открывает подробности заявки."
           />
+
+          <ApplicationsFiltersBar
+            searchValue={applicationSearchQuery}
+            onSearchChange={setApplicationSearchQuery}
+            sortValue={applicationSortMode}
+            onSortChange={setApplicationSortMode}
+            showStatusFilter={false}
+            helperText="Поиск работает по ФИО, специальности, отделению, статусу и номеру заявки. Сортировка применяется внутри каждой колонки."
+          />
+
+          {visibleApplicationsCount === 0 ? (
+            <Box sx={{ p: 2 }}>
+              <EmptyState
+                title="Ничего не найдено"
+                text="Попробуйте изменить поиск или сортировку."
+              />
+            </Box>
+          ) : null}
 
           <Box
             sx={{
@@ -3340,6 +3480,90 @@ function SectionHeader({ title, text }) {
         {text}
       </Typography>
     </Stack>
+  );
+}
+
+function ApplicationsFiltersBar({
+  searchValue,
+  onSearchChange,
+  sortValue,
+  onSortChange,
+  showStatusFilter,
+  statusValue = 'ALL',
+  onStatusChange,
+  statusFilterLabel = 'Статус',
+  helperText,
+}) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2.5, bgcolor: alpha('#fff', 0.82) }}>
+      <CardContent sx={{ p: 2 }}>
+        <Stack spacing={1.5}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={showStatusFilter ? 5 : 6}>
+              <TextField
+                label="Поиск"
+                value={searchValue}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="ФИО, специальность, отделение, № заявки"
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search fontSize="small" color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={showStatusFilter ? 3 : 6}>
+              <TextField
+                select
+                label="Сортировка"
+                value={sortValue}
+                onChange={(event) => onSortChange(event.target.value)}
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Sort fontSize="small" color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              >
+                {APPLICATION_SORT_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            {showStatusFilter ? (
+              <Grid item xs={12} md={4}>
+                <TextField
+                  select
+                  label={statusFilterLabel}
+                  value={statusValue}
+                  onChange={(event) => onStatusChange(event.target.value)}
+                  fullWidth
+                >
+                  {APPLICATION_STATUS_FILTER_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            ) : null}
+          </Grid>
+
+          {helperText ? (
+            <Typography variant="caption" color="text.secondary">
+              {helperText}
+            </Typography>
+          ) : null}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
