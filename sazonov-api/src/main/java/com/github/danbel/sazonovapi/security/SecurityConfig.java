@@ -42,7 +42,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.addAllowedOriginPattern("*");
+        configuration.addAllowedOriginPattern("https://sazonov.danbel.ru");
+        configuration.addAllowedOriginPattern("http://localhost:3000");
+        configuration.addAllowedOriginPattern("http://127.0.0.1:3000");
         configuration.addAllowedHeader("*");
         configuration.addAllowedMethod("*");
         configuration.setAllowCredentials(false);
