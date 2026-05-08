@@ -497,14 +497,15 @@ function App() {
       return;
     }
 
+    const internalSections = new Set(['application-details', 'application-create', 'department-form', 'user-form']);
+
     if (navigationTabs.length === 0) {
       setActiveSection('');
       return;
     }
 
     if (
-      activeSection !== 'application-details' &&
-      activeSection !== 'application-create' &&
+      !internalSections.has(activeSection) &&
       !navigationTabs.some((item) => item.value === activeSection)
     ) {
       setActiveSection(navigationTabs[0].value);
@@ -890,6 +891,7 @@ function App() {
           active: saved.active,
         });
       }
+      setActiveSection('users');
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -929,6 +931,7 @@ function App() {
       role: user.role,
       active: user.active,
     });
+    setActiveSection('user-form');
   }
 
   function startNewSpeciality() {
@@ -969,6 +972,7 @@ function App() {
           description: saved.description || '',
         });
       }
+      setActiveSection('departments');
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -998,6 +1002,7 @@ function App() {
         setSelectedDepartmentId('');
         setDepartmentForm(emptyDepartment);
       }
+      setActiveSection('departments');
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -1011,18 +1016,21 @@ function App() {
       name: department.name,
       description: department.description || '',
     });
+    setActiveSection('department-form');
   }
 
   function startNewDepartment() {
     setCreatingDepartment(true);
     setSelectedDepartmentId('');
     setDepartmentForm(emptyDepartment);
+    setActiveSection('department-form');
   }
 
   function startNewUser() {
     setCreatingUser(true);
     setSelectedUserId('');
     setUserForm(emptyUser);
+    setActiveSection('user-form');
   }
 
   const primaryActionLabel = selectedAdminSpeciality && !creatingSpeciality ? 'Сохранить специальность' : 'Создать специальность';
@@ -1439,6 +1447,8 @@ function renderActiveSection(props) {
             return <StaffQueueSection {...props} />;
           case 'departments':
             return <AdminDepartmentsSection {...props} />;
+          case 'department-form':
+            return <AdminDepartmentFormSection {...props} />;
           case 'application-details':
             return (
               <ApplicantApplicationDetailsSection
@@ -1458,16 +1468,18 @@ function renderActiveSection(props) {
             return <LeaderboardSection {...props} />;
           case 'users':
             return <AdminUsersSection {...props} />;
-        case 'dashboard':
-        default:
-          return (
-            <AdminDashboardSection
-              adminDashboard={props.adminDashboard}
-              adminDepartments={props.adminDepartments}
-              adminSpecialities={props.adminSpecialities}
-            />
-          );
-      }
+          case 'user-form':
+            return <AdminUserFormSection {...props} />;
+          case 'dashboard':
+          default:
+            return (
+              <AdminDashboardSection
+                adminDashboard={props.adminDashboard}
+                adminDepartments={props.adminDepartments}
+                adminSpecialities={props.adminSpecialities}
+              />
+            );
+        }
     default:
       return null;
   }
@@ -2796,11 +2808,60 @@ function AdminDashboardSection({ adminDashboard, adminDepartments, adminSpeciali
 
 function AdminDepartmentsSection({
   adminDepartments,
+  selectDepartmentForEditing,
+  startNewDepartment,
+}) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
+          <SectionHeader
+            title="Отделения"
+            text="Откройте любое отделение, чтобы редактировать его на отдельной странице."
+          />
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Button variant="contained" startIcon={<Add />} onClick={startNewDepartment}>
+              Новое отделение
+            </Button>
+          </Stack>
+
+          <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+            {adminDepartments.map((department) => (
+              <ListItemButton
+                key={department.id}
+                onClick={() => selectDepartmentForEditing(department)}
+                sx={{ alignItems: 'flex-start', py: 1.5 }}
+              >
+                <ListItemText
+                  primary={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        {department.code}
+                      </Typography>
+                      <Chip size="small" variant="outlined" label="Открыть" />
+                    </Stack>
+                  }
+                  secondary={department.name}
+                />
+              </ListItemButton>
+            ))}
+            {!adminDepartments.length ? (
+              <Box sx={{ p: 2 }}>
+                <EmptyState title="Отделений пока нет" text="Создайте первое отделение, чтобы привязать к нему специальности." />
+              </Box>
+            ) : null}
+          </List>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AdminDepartmentFormSection({
   departmentForm,
   setDepartmentForm,
   selectedDepartment,
-  selectDepartmentForEditing,
-  startNewDepartment,
+  setActiveSection,
   handleDepartmentSave,
   handleDeleteDepartment,
   departmentActionLabel,
@@ -2810,82 +2871,56 @@ function AdminDepartmentsSection({
       <CardContent sx={{ p: 3 }}>
         <Stack spacing={2.5}>
           <SectionHeader
-            title="Отделения"
-            text="Создавайте отделения, а затем привязывайте к ним специальности."
+            title={selectedDepartment ? 'Редактирование отделения' : 'Новое отделение'}
+            text="Заполните данные отделения и сохраните изменения."
           />
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Button variant="outlined" startIcon={<Add />} onClick={startNewDepartment}>
-              Новое отделение
+            <Button variant="outlined" onClick={() => setActiveSection('departments')}>
+              Назад к отделениям
             </Button>
           </Stack>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={5}>
-              <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                {adminDepartments.map((department) => (
-                  <ListItemButton
-                    key={department.id}
-                    selected={selectedDepartment?.id === department.id}
-                    onClick={() => selectDepartmentForEditing(department)}
-                    sx={{ alignItems: 'flex-start', py: 1.5 }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          {department.code}
-                        </Typography>
-                      }
-                      secondary={department.name}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
+          <Stack component="form" spacing={2} onSubmit={handleDepartmentSave}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Код"
+                  value={departmentForm.code}
+                  onChange={(event) => setDepartmentForm({ ...departmentForm, code: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Название"
+                  value={departmentForm.name}
+                  onChange={(event) => setDepartmentForm({ ...departmentForm, name: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Описание"
+                  value={departmentForm.description}
+                  onChange={(event) => setDepartmentForm({ ...departmentForm, description: event.target.value })}
+                  multiline
+                  minRows={4}
+                  fullWidth
+                />
+              </Grid>
             </Grid>
 
-            <Grid item xs={12} md={7}>
-              <Stack component="form" spacing={2} onSubmit={handleDepartmentSave}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Код"
-                      value={departmentForm.code}
-                      onChange={(event) => setDepartmentForm({ ...departmentForm, code: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Название"
-                      value={departmentForm.name}
-                      onChange={(event) => setDepartmentForm({ ...departmentForm, name: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Описание"
-                      value={departmentForm.description}
-                      onChange={(event) => setDepartmentForm({ ...departmentForm, description: event.target.value })}
-                      multiline
-                      minRows={4}
-                      fullWidth
-                    />
-                  </Grid>
-                </Grid>
-
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  <Button type="submit" variant="contained">
-                    {departmentActionLabel}
-                  </Button>
-                  {selectedDepartment ? (
-                    <Button type="button" color="error" variant="outlined" onClick={handleDeleteDepartment} startIcon={<DeleteOutline />}>
-                      Удалить отделение
-                    </Button>
-                  ) : null}
-                </Stack>
-              </Stack>
-            </Grid>
-          </Grid>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Button type="submit" variant="contained">
+                {departmentActionLabel}
+              </Button>
+              {selectedDepartment ? (
+                <Button type="button" color="error" variant="outlined" onClick={handleDeleteDepartment} startIcon={<DeleteOutline />}>
+                  Удалить отделение
+                </Button>
+              ) : null}
+            </Stack>
+          </Stack>
         </Stack>
       </CardContent>
     </Card>
@@ -2928,41 +2963,41 @@ function AdminSpecialitiesSection({
                     onClick={() => selectSpecialityForEditing(speciality)}
                     sx={{ alignItems: 'flex-start', py: 1.5 }}
                   >
-                          <ListItemText
-                            primary={
-                              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                                {speciality.code}
-                              </Typography>
-                            }
-                            secondary={`${speciality.department?.name || 'Без отделения'} · ${speciality.name}`}
-                          />
-                        </ListItemButton>
-                      ))}
-                    </List>
-                  </Grid>
+                    <ListItemText
+                      primary={
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          {speciality.code}
+                        </Typography>
+                      }
+                      secondary={`${speciality.department?.name || 'Без отделения'} · ${speciality.name}`}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Grid>
 
-                  <Grid item xs={12} md={7}>
-                    <Stack component="form" spacing={2} onSubmit={handleSpecialitySave}>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                          <TextField
-                            select
-                            label="Отделение"
-                            value={specialityForm.departmentId}
-                            onChange={(event) => setSpecialityForm({ ...specialityForm, departmentId: event.target.value })}
-                            fullWidth
-                          >
-                            <MenuItem value="">Выберите отделение</MenuItem>
-                            {adminDepartments.map((department) => (
-                              <MenuItem key={department.id} value={department.id}>
-                                {department.code} · {department.name}
-                              </MenuItem>
-                            ))}
-                          </TextField>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            label="Код"
+            <Grid item xs={12} md={7}>
+              <Stack component="form" spacing={2} onSubmit={handleSpecialitySave}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      select
+                      label="Отделение"
+                      value={specialityForm.departmentId}
+                      onChange={(event) => setSpecialityForm({ ...specialityForm, departmentId: event.target.value })}
+                      fullWidth
+                    >
+                      <MenuItem value="">Выберите отделение</MenuItem>
+                      {adminDepartments.map((department) => (
+                        <MenuItem key={department.id} value={department.id}>
+                          {department.code} · {department.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Код"
                       value={specialityForm.code}
                       onChange={(event) => setSpecialityForm({ ...specialityForm, code: event.target.value })}
                       fullWidth
@@ -2976,7 +3011,7 @@ function AdminSpecialitiesSection({
                       fullWidth
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       label="Бюджетные места"
                       type="number"
@@ -2985,7 +3020,7 @@ function AdminSpecialitiesSection({
                       fullWidth
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       label="Платные места"
                       type="number"
@@ -2994,7 +3029,7 @@ function AdminSpecialitiesSection({
                       fullWidth
                     />
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       label="План приема"
                       type="number"
@@ -3036,11 +3071,60 @@ function AdminSpecialitiesSection({
 
 function AdminUsersSection({
   adminUsers,
+  selectUserForEditing,
+  startNewUser,
+}) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
+          <SectionHeader
+            title="Пользователи"
+            text="Откройте пользователя, чтобы редактировать его на отдельной странице."
+          />
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Button variant="contained" startIcon={<Add />} onClick={startNewUser}>
+              Новый пользователь
+            </Button>
+          </Stack>
+
+          <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+            {adminUsers.map((user) => (
+              <ListItemButton
+                key={user.id}
+                onClick={() => selectUserForEditing(user)}
+                sx={{ alignItems: 'flex-start', py: 1.5 }}
+              >
+                <ListItemText
+                  primary={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        {user.fullName}
+                      </Typography>
+                      <Chip size="small" variant="outlined" label={ROLE_LABELS[user.role]} />
+                    </Stack>
+                  }
+                  secondary={`${user.username} · ${user.email || 'без email'}`}
+                />
+              </ListItemButton>
+            ))}
+            {!adminUsers.length ? (
+              <Box sx={{ p: 2 }}>
+                <EmptyState title="Пользователей пока нет" text="Создайте первого сотрудника или администратора." />
+              </Box>
+            ) : null}
+          </List>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AdminUserFormSection({
   userForm,
   setUserForm,
   selectedAdminUser,
-  selectUserForEditing,
-  startNewUser,
+  setActiveSection,
   handleUserSave,
   userActionLabel,
 }) {
@@ -3049,118 +3133,94 @@ function AdminUsersSection({
       <CardContent sx={{ p: 3 }}>
         <Stack spacing={2.5}>
           <SectionHeader
-            title="Пользователи"
-            text="Создавайте сотрудников, администраторов и корректируйте доступы."
+            title={selectedAdminUser ? 'Редактирование пользователя' : 'Новый пользователь'}
+            text="Создайте сотрудника или администратора на отдельной странице."
           />
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Button variant="outlined" startIcon={<Add />} onClick={startNewUser}>
-              Новый пользователь
+            <Button variant="outlined" onClick={() => setActiveSection('users')}>
+              Назад к пользователям
             </Button>
           </Stack>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={5}>
-              <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                {adminUsers.map((user) => (
-                  <ListItemButton
-                    key={user.id}
-                    selected={selectedAdminUser?.id === user.id}
-                    onClick={() => selectUserForEditing(user)}
-                    sx={{ alignItems: 'flex-start', py: 1.5 }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          {user.fullName}
-                        </Typography>
-                      }
-                      secondary={`${user.username} · ${ROLE_LABELS[user.role]}`}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
+          <Stack component="form" spacing={2} onSubmit={handleUserSave}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="ФИО"
+                  value={userForm.fullName}
+                  onChange={(event) => setUserForm({ ...userForm, fullName: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Логин"
+                  value={userForm.username}
+                  onChange={(event) => setUserForm({ ...userForm, username: event.target.value })}
+                  fullWidth
+                  InputProps={{ readOnly: Boolean(selectedAdminUser) }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Пароль"
+                  type="password"
+                  value={userForm.password}
+                  onChange={(event) => setUserForm({ ...userForm, password: event.target.value })}
+                  placeholder={selectedAdminUser ? 'Оставьте пустым, если не меняете' : ''}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Email"
+                  type="email"
+                  value={userForm.email}
+                  onChange={(event) => setUserForm({ ...userForm, email: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Телефон"
+                  value={userForm.phone}
+                  onChange={(event) => setUserForm({ ...userForm, phone: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField
+                  select
+                  label="Роль"
+                  value={userForm.role}
+                  onChange={(event) => setUserForm({ ...userForm, role: event.target.value })}
+                  fullWidth
+                >
+                  <MenuItem value="STAFF">Сотрудник</MenuItem>
+                  <MenuItem value="ADMIN">Администратор</MenuItem>
+                  <MenuItem value="APPLICANT">Абитуриент</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField
+                  select
+                  label="Активность"
+                  value={userForm.active ? 'true' : 'false'}
+                  onChange={(event) => setUserForm({ ...userForm, active: event.target.value === 'true' })}
+                  fullWidth
+                >
+                  <MenuItem value="true">Активен</MenuItem>
+                  <MenuItem value="false">Отключен</MenuItem>
+                </TextField>
+              </Grid>
             </Grid>
 
-            <Grid item xs={12} md={7}>
-              <Stack component="form" spacing={2} onSubmit={handleUserSave}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="ФИО"
-                      value={userForm.fullName}
-                      onChange={(event) => setUserForm({ ...userForm, fullName: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Логин"
-                      value={userForm.username}
-                      onChange={(event) => setUserForm({ ...userForm, username: event.target.value })}
-                      fullWidth
-                      InputProps={{ readOnly: Boolean(selectedAdminUser) }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Пароль"
-                      type="password"
-                      value={userForm.password}
-                      onChange={(event) => setUserForm({ ...userForm, password: event.target.value })}
-                      placeholder={selectedAdminUser ? 'Оставьте пустым, если не меняете' : ''}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Email"
-                      type="email"
-                      value={userForm.email}
-                      onChange={(event) => setUserForm({ ...userForm, email: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Телефон"
-                      value={userForm.phone}
-                      onChange={(event) => setUserForm({ ...userForm, phone: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField
-                      select
-                      label="Роль"
-                      value={userForm.role}
-                      onChange={(event) => setUserForm({ ...userForm, role: event.target.value })}
-                      fullWidth
-                    >
-                      <MenuItem value="STAFF">Сотрудник</MenuItem>
-                      <MenuItem value="ADMIN">Администратор</MenuItem>
-                      <MenuItem value="APPLICANT">Абитуриент</MenuItem>
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField
-                      select
-                      label="Активность"
-                      value={userForm.active ? 'true' : 'false'}
-                      onChange={(event) => setUserForm({ ...userForm, active: event.target.value === 'true' })}
-                      fullWidth
-                    >
-                      <MenuItem value="true">Активен</MenuItem>
-                      <MenuItem value="false">Отключен</MenuItem>
-                    </TextField>
-                  </Grid>
-                </Grid>
-
-                <Button type="submit" variant="contained">
-                  {userActionLabel}
-                </Button>
-              </Stack>
-            </Grid>
-          </Grid>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Button type="submit" variant="contained">
+                {userActionLabel}
+              </Button>
+            </Stack>
+          </Stack>
         </Stack>
       </CardContent>
     </Card>
