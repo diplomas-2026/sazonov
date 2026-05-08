@@ -299,6 +299,7 @@ function App() {
   const [applicationCreateDocumentGroups, setApplicationCreateDocumentGroups] = useState([
     createApplicationDocumentGroup('PASSPORT'),
   ]);
+  const [applicationDocumentUploadFiles, setApplicationDocumentUploadFiles] = useState([]);
   const [departmentForm, setDepartmentForm] = useState(emptyDepartment);
   const [specialityForm, setSpecialityForm] = useState(emptySpeciality);
   const [userForm, setUserForm] = useState(emptyUser);
@@ -330,6 +331,7 @@ function App() {
   const [applicationStatusFilter, setApplicationStatusFilter] = useState('ALL');
   const [savingApplicationEdit, setSavingApplicationEdit] = useState(false);
   const [cancellingApplication, setCancellingApplication] = useState(false);
+  const [uploadingDocuments, setUploadingDocuments] = useState(false);
   const [updatingApplicationId, setUpdatingApplicationId] = useState('');
   const [departmentErrors, setDepartmentErrors] = useState(emptyDepartmentErrors);
   const [specialityErrors, setSpecialityErrors] = useState(emptySpecialityErrors);
@@ -550,9 +552,11 @@ function App() {
         applicantComment: selectedApplicantApplication.applicantComment || '',
       });
       setApplicationEditErrors(emptyApplicationErrors);
+      setApplicationDocumentUploadFiles([]);
     } else {
       setApplicationEditForm(emptyApplicationEdit);
       setApplicationEditErrors(emptyApplicationErrors);
+      setApplicationDocumentUploadFiles([]);
     }
   }, [selectedApplicantApplication]);
 
@@ -707,6 +711,7 @@ function App() {
     setPublicDepartments([]);
     setPublicLeaderboard([]);
     setApplicationCreateDocumentGroups([createApplicationDocumentGroup('PASSPORT')]);
+    setApplicationDocumentUploadFiles([]);
     setApplicationForm(emptyApplication);
     setApplicationEditForm(emptyApplicationEdit);
     setApplicationFormErrors(emptyApplicationErrors);
@@ -719,6 +724,7 @@ function App() {
     setSelectedDepartmentId('');
     setSavingApplicationEdit(false);
     setCancellingApplication(false);
+    setUploadingDocuments(false);
     setApplicationSearchQuery('');
     setApplicationSortMode('newest');
     setApplicationStatusFilter('ALL');
@@ -966,7 +972,10 @@ function App() {
   async function handleUploadDocument(event) {
     event.preventDefault();
     if (!auth || !selectedApplicantApplicationId) return;
-    const files = Array.from(event.currentTarget.elements.documentFiles?.files || []);
+    if (uploadingDocuments) {
+      return;
+    }
+    const files = applicationDocumentUploadFiles;
     const type = event.currentTarget.elements.type?.value;
     if (!files.length) {
       setError('Выберите от 1 до 5 файлов');
@@ -979,6 +988,7 @@ function App() {
 
     setError('');
     setMessage('');
+    setUploadingDocuments(true);
 
     try {
       const oversizedFile = files.find((file) => !isFileWithinLimit(file));
@@ -991,9 +1001,12 @@ function App() {
       const applications = await api.applicantApplications(auth.token);
       setApplicantApplications(applications);
       setMessage(files.length === 1 ? 'Документ загружен' : `Загружено файлов: ${files.length}`);
+      setApplicationDocumentUploadFiles([]);
       event.currentTarget.reset();
     } catch (nextError) {
       setError(nextError.message);
+    } finally {
+      setUploadingDocuments(false);
     }
   }
 
@@ -1497,6 +1510,9 @@ function App() {
               handleUploadDocument,
               handleDeleteDocument,
               handleDownloadDocument,
+              applicationDocumentUploadFiles,
+              setApplicationDocumentUploadFiles,
+              uploadingDocuments,
               applicationEditForm,
               setApplicationEditForm,
               applicationEditErrors,
@@ -1980,6 +1996,10 @@ function ApplicantApplicationDetailsSection({
   viewerRole,
   applicantUsedSpecialityIds,
   publicSpecialities,
+  applicationDocumentUploadFiles,
+  setApplicationDocumentUploadFiles,
+  setError,
+  uploadingDocuments,
   applicationEditForm,
   setApplicationEditForm,
   applicationEditErrors,
@@ -2323,15 +2343,76 @@ function ApplicantApplicationDetailsSection({
                                 type="file"
                                 hidden
                                 multiple
+                                onChange={(event) => {
+                                  const nextFiles = Array.from(event.target.files || []);
+                                  if (!nextFiles.length) {
+                                    return;
+                                  }
+                                  if (nextFiles.length > MAX_UPLOAD_FILES_PER_BATCH) {
+                                    setError(getFileCountLimitMessage());
+                                    return;
+                                  }
+                                  const tooLargeFile = nextFiles.find((file) => !isFileWithinLimit(file));
+                                  if (tooLargeFile) {
+                                    setError(getFileSizeLimitMessage(tooLargeFile));
+                                    return;
+                                  }
+                                  setError('');
+                                  setApplicationDocumentUploadFiles(nextFiles);
+                                }}
                               />
                             </Button>
                           </Grid>
                         </Grid>
+                        <Stack spacing={1}>
+                          {applicationDocumentUploadFiles.length ? (
+                            applicationDocumentUploadFiles.map((file, index) => (
+                              <Card key={`${file.name}-${file.size}-${index}`} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <CardContent sx={{ py: 1.5, px: 2 }}>
+                                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                                    <Box sx={{ minWidth: 0 }}>
+                                      <Typography variant="subtitle2" sx={{ fontWeight: 700, wordBreak: 'break-word' }}>
+                                        {file.name}
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {formatBytes(file.size)}
+                                      </Typography>
+                                    </Box>
+                                    <Button
+                                      size="small"
+                                      color="error"
+                                      variant="text"
+                                      startIcon={<DeleteOutline />}
+                                      disabled={uploadingDocuments}
+                                      onClick={() => {
+                                        setApplicationDocumentUploadFiles((current) =>
+                                          current.filter((_, currentIndex) => currentIndex !== index),
+                                        );
+                                      }}
+                                    >
+                                      Удалить
+                                    </Button>
+                                  </Stack>
+                                </CardContent>
+                              </Card>
+                            ))
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              Выбранные файлы появятся здесь. Можно удалить любой файл до отправки.
+                            </Typography>
+                          )}
+                        </Stack>
                         <Typography variant="caption" color="text.secondary">
                           Максимум {MAX_UPLOAD_FILES_PER_BATCH} файлов за раз, каждый до {MAX_UPLOAD_SIZE_LABEL}
                         </Typography>
-                        <Button type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>
-                          Загрузить
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          sx={{ alignSelf: 'flex-start' }}
+                          disabled={uploadingDocuments || !applicationDocumentUploadFiles.length}
+                          startIcon={uploadingDocuments ? <CircularProgress size={18} color="inherit" /> : <CloudUpload />}
+                        >
+                          {uploadingDocuments ? 'Загрузка...' : 'Загрузить'}
                         </Button>
                       </Box>
                     </CardContent>
