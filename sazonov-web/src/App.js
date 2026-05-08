@@ -418,7 +418,7 @@ function App() {
       return;
     }
 
-    if (!navigationTabs.some((item) => item.value === activeSection)) {
+    if (activeSection !== 'application-details' && !navigationTabs.some((item) => item.value === activeSection)) {
       setActiveSection(navigationTabs[0].value);
     }
   }, [auth, navigationTabs, activeSection]);
@@ -1151,12 +1151,6 @@ function App() {
               </CardContent>
             </Card>
 
-            <Grid container spacing={2}>
-              <MetricCard label="Одобрено" value={publicDashboard?.accepted || 0} tone="success" />
-              <MetricCard label="Отклонено" value={publicDashboard?.rejected || 0} tone="error" />
-              <MetricCard label="Нужны документы" value={publicDashboard?.missingDocs || 0} tone="warning" />
-            </Grid>
-
             {renderActiveSection({
               auth,
               activeSection,
@@ -1232,6 +1226,8 @@ function renderActiveSection(props) {
           return <ApplicantApplicationsSection {...props} />;
         case 'application-create':
           return <ApplicantApplicationCreateSection {...props} />;
+        case 'application-details':
+          return <ApplicantApplicationDetailsSection {...props} />;
         case 'documents':
           return <ApplicantDocumentsSection {...props} />;
         case 'departments':
@@ -1337,7 +1333,10 @@ function ApplicantApplicationsSection({
               <ListItemButton
                 key={application.id}
                 selected={selectedApplicantApplication?.id === application.id}
-                onClick={() => setSelectedApplicantApplicationId(`${application.id}`)}
+                onClick={() => {
+                  setSelectedApplicantApplicationId(`${application.id}`);
+                  setActiveSection('application-details');
+                }}
                 sx={{ alignItems: 'flex-start', py: 1.5 }}
               >
                 <ListItemText
@@ -1362,6 +1361,119 @@ function ApplicantApplicationsSection({
         </Stack>
       </CardContent>
     </Card>
+  );
+}
+
+function ApplicantApplicationDetailsSection({
+  selectedApplicantApplication,
+  setActiveSection,
+  handleDownloadDocument,
+  handleDeleteDocument,
+  handleUploadDocument,
+  documentTypes,
+}) {
+  return (
+    <Stack spacing={2.5}>
+      <Card variant="outlined" sx={{ borderRadius: 3 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Stack spacing={2}>
+            <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+              <Box>
+                <SectionHeader title="Подробности заявки" text="Полная информация по выбранной записи." />
+              </Box>
+              <Button variant="outlined" onClick={() => setActiveSection('applications')}>
+                К списку заявок
+              </Button>
+            </Stack>
+
+            {selectedApplicantApplication ? (
+              <Stack spacing={2.5}>
+                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                  <CardContent>
+                    <Stack spacing={2}>
+                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+                        <Box>
+                          <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                            Заявка №{selectedApplicantApplication.id}
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            {selectedApplicantApplication.speciality.department?.name || 'Без отделения'} · {selectedApplicantApplication.speciality.code} · {selectedApplicantApplication.speciality.name}
+                          </Typography>
+                        </Box>
+                        <StatusChip status={selectedApplicantApplication.status} />
+                      </Stack>
+
+                      <Grid container spacing={2}>
+                        <InfoTile label="Паспорт" value={`${selectedApplicantApplication.passportSeries} ${selectedApplicantApplication.passportNumber}`} />
+                        <InfoTile label="СНИЛС" value={selectedApplicantApplication.snils} />
+                        <InfoTile label="Аттестат" value={selectedApplicantApplication.educationDocumentNumber} />
+                        <InfoTile label="Школа" value={selectedApplicantApplication.graduationSchool} />
+                        <InfoTile label="Баллы" value={selectedApplicantApplication.points} />
+                        <InfoTile label="Комментарий сотрудника" value={selectedApplicantApplication.staffComment || 'Пока нет замечаний'} />
+                      </Grid>
+                    </Stack>
+                  </CardContent>
+                </Card>
+
+                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                  <CardContent>
+                    <SectionHeader title="Документы заявки" text="Файлы, прикрепленные именно к этой заявке." />
+                    <Stack spacing={1.5}>
+                      {selectedApplicantApplication.documents?.map((document) => (
+                        <DocumentRow
+                          key={document.id}
+                          document={document}
+                          onDownload={() => handleDownloadDocument(document.id)}
+                          onDelete={() => handleDeleteDocument(document.id)}
+                        />
+                      ))}
+                      {!selectedApplicantApplication.documents?.length ? (
+                        <EmptyState title="Пока нет документов" text="Здесь появятся прикрепленные файлы." />
+                      ) : null}
+                    </Stack>
+                  </CardContent>
+                </Card>
+
+                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                  <CardContent>
+                    <SectionHeader title="Загрузка документа" text="Добавьте файл к выбранной заявке." />
+                    <Box component="form" onSubmit={handleUploadDocument} sx={{ display: 'grid', gap: 2 }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={6}>
+                          <TextField select name="type" label="Тип документа" defaultValue={documentTypes[0].value} fullWidth>
+                            {documentTypes.map((item) => (
+                              <MenuItem key={item.value} value={item.value}>
+                                {item.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <Button
+                            component="label"
+                            variant="outlined"
+                            startIcon={<CloudUpload />}
+                            sx={{ height: '56px', width: '100%', justifyContent: 'flex-start' }}
+                          >
+                            Выбрать файл
+                            <input name="file" type="file" hidden />
+                          </Button>
+                        </Grid>
+                      </Grid>
+                      <Button type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>
+                        Загрузить
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Stack>
+            ) : (
+              <EmptyState title="Нет выбранной заявки" text="Откройте заявку из списка, чтобы посмотреть подробности." />
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+    </Stack>
   );
 }
 
