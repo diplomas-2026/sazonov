@@ -40,7 +40,6 @@ import {
   Logout,
   ManageAccounts,
   Search,
-  Refresh,
   Assignment,
   Person,
   School,
@@ -955,14 +954,6 @@ function App() {
     }
   }
 
-  async function handleWorkspaceRefresh() {
-    if (!auth) {
-      return;
-    }
-
-    await loadWorkspace(auth);
-  }
-
   function selectSpecialityForEditing(speciality) {
     setCreatingSpeciality(false);
     setSelectedSpecialityId(`${speciality.id}`);
@@ -1140,9 +1131,6 @@ function App() {
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
             {auth ? (
               <>
-                <Button variant="outlined" startIcon={<Refresh />} onClick={handleWorkspaceRefresh} sx={{ borderRadius: 2 }}>
-                  Обновить
-                </Button>
                 <Button variant="contained" color="inherit" startIcon={<Logout />} onClick={handleLogout} sx={{ borderRadius: 2 }}>
                   Выйти
                 </Button>
