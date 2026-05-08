@@ -537,6 +537,7 @@ function App() {
           { value: 'applications', label: 'Заявки', icon: <Assignment fontSize="small" /> },
           { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
+          { value: 'specialities', label: 'Специальности', icon: <School fontSize="small" /> },
           { value: 'users', label: 'Пользователи', icon: <AdminPanelSettings fontSize="small" /> },
         ];
       default:
@@ -871,6 +872,7 @@ function App() {
           admissionPlan: saved.admissionPlan,
         });
       }
+      setActiveSection('specialities');
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -904,6 +906,7 @@ function App() {
         setSelectedSpecialityId('');
         setSpecialityForm(emptySpeciality);
       }
+      setActiveSection('specialities');
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -966,6 +969,7 @@ function App() {
       paidPlaces: speciality.paidPlaces,
       admissionPlan: speciality.admissionPlan,
     });
+    setActiveSection('specialities');
   }
 
   function selectUserForEditing(user) {
@@ -990,6 +994,7 @@ function App() {
       ...emptySpeciality,
       departmentId: selectedDepartment?.id ? `${selectedDepartment.id}` : `${adminDepartments[0]?.id || ''}`,
     });
+    setActiveSection('specialities');
   }
 
   async function handleDepartmentSave(event) {
@@ -1383,6 +1388,8 @@ function renderActiveSection(props) {
             return <AdminDepartmentsSection {...props} />;
           case 'department-form':
             return <AdminDepartmentFormSection {...props} />;
+          case 'specialities':
+            return <AdminSpecialitiesSection {...props} />;
           case 'application-details':
             return (
               <ApplicantApplicationDetailsSection
