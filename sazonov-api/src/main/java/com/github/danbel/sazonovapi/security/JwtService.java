@@ -23,7 +23,7 @@ public class JwtService {
 
     public JwtService(
         @Value("${app.jwt.secret:dev-secret-change-me-dev-secret-change-me}") String secret,
-        @Value("${app.jwt.expiration-minutes:480}") long expirationMinutes
+        @Value("${app.jwt.expiration-minutes:5256000}") long expirationMinutes
     ) {
         this.algorithm = Algorithm.HMAC256(secret);
         this.verifier = JWT.require(algorithm).build();

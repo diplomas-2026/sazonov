@@ -2231,22 +2231,46 @@ function DepartmentDirectorySection({ departments, specialities }) {
             <Grid item xs={12} sm={6} lg={4} key={department.id}>
               <Card variant="outlined" sx={{ height: '100%', borderRadius: 2.5, bgcolor: alpha('#fff', 0.9) }}>
                 <CardContent>
-                  <Stack spacing={1.5}>
-                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                      <Chip label={department.code} size="small" />
-                      <Chip
-                        label={`${specialities.filter((item) => item.department?.id === department.id).length} спец.`}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </Stack>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      {department.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {department.description}
-                    </Typography>
-                  </Stack>
+                  {(() => {
+                    const departmentSpecialities = specialities.filter((item) => item.department?.id === department.id);
+                    return (
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                          <Chip label={department.code} size="small" />
+                          <Chip label={`${departmentSpecialities.length} спец.`} size="small" variant="outlined" />
+                        </Stack>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          {department.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {department.description}
+                        </Typography>
+                        <Divider sx={{ my: 0.5 }} />
+                        <Stack spacing={1}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+                            Специальности
+                          </Typography>
+                          {departmentSpecialities.length ? (
+                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                              {departmentSpecialities.map((speciality) => (
+                                <Chip
+                                  key={speciality.id}
+                                  label={`${speciality.code} · ${speciality.name}`}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ maxWidth: '100%' }}
+                                />
+                              ))}
+                            </Stack>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              Пока нет специальных программ.
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Stack>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </Grid>
