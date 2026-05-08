@@ -190,6 +190,7 @@ function App() {
   const [activeSection, setActiveSection] = useState('');
   const [savingApplicationEdit, setSavingApplicationEdit] = useState(false);
   const [cancellingApplication, setCancellingApplication] = useState(false);
+  const [updatingApplicationId, setUpdatingApplicationId] = useState('');
 
   const loadPublic = useCallback(async () => {
     try {
@@ -751,6 +752,7 @@ function App() {
     if (!auth) return;
     setError('');
     setMessage('');
+    setUpdatingApplicationId(`${applicationId}`);
 
     try {
       await api.staffUpdateStatus(auth.token, applicationId, {
@@ -762,6 +764,8 @@ function App() {
       setMessage('Статус заявки обновлён');
     } catch (nextError) {
       setError(nextError.message);
+    } finally {
+      setUpdatingApplicationId('');
     }
   }
 
@@ -1351,6 +1355,7 @@ function App() {
               startNewUser,
               handleUserSave,
               userActionLabel,
+              updatingApplicationId,
             })}
           </Stack>
         )}
@@ -1580,6 +1585,7 @@ function ApplicantApplicationDetailsSection({
   documentTypes,
   savingApplicationEdit,
   cancellingApplication,
+  updatingApplicationId,
 }) {
   return (
     <Stack spacing={2.5}>
@@ -1601,34 +1607,45 @@ function ApplicantApplicationDetailsSection({
             {selectedApplicantApplication ? (
               <Stack spacing={2.5}>
                 {viewerRole !== 'APPLICANT' ? (
-                  <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                    <CardContent>
-                      <SectionHeader
-                        title="Смена статуса"
-                        text="Перетаскивание карточек в канбане меняет статус, а здесь можно внести статус и комментарий вручную."
-                      />
-                      <Stack component="form" spacing={2} onSubmit={handleStaffStatusSave}>
-                        <TextField select name="status" label="Новый статус" defaultValue={selectedApplicantApplication.status} fullWidth>
-                          {KANBAN_STATUSES.map((status) => (
-                            <MenuItem key={status} value={status}>
-                              {STATUS_LABELS[status]}
+                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                  <CardContent>
+                    <SectionHeader
+                      title="Смена статуса"
+                      text="Перетаскивание карточек в канбане меняет статус, а здесь можно внести статус и комментарий вручную."
+                    />
+                    <Stack component="form" spacing={2} onSubmit={handleStaffStatusSave}>
+                      <TextField select name="status" label="Новый статус" defaultValue={selectedApplicantApplication.status} fullWidth>
+                        {KANBAN_STATUSES.map((status) => (
+                          <MenuItem key={status} value={status}>
+                            {STATUS_LABELS[status]}
                             </MenuItem>
                           ))}
                         </TextField>
                         <TextField
-                          name="staffComment"
-                          label="Комментарий"
-                          defaultValue={selectedApplicantApplication.staffComment || ''}
-                          multiline
-                          minRows={3}
-                          fullWidth
-                        />
-                        <Button type="submit" variant="contained" startIcon={<AssignmentTurnedIn />}>
-                          Сохранить статус
+                        name="staffComment"
+                        label="Комментарий"
+                        defaultValue={selectedApplicantApplication.staffComment || ''}
+                        multiline
+                        minRows={3}
+                        fullWidth
+                      />
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          startIcon={
+                            updatingApplicationId === `${selectedApplicantApplication.id}` ? (
+                              <CircularProgress size={18} color="inherit" />
+                            ) : (
+                              <AssignmentTurnedIn />
+                            )
+                          }
+                          disabled={updatingApplicationId === `${selectedApplicantApplication.id}`}
+                        >
+                          {updatingApplicationId === `${selectedApplicantApplication.id}` ? 'Сохраняем...' : 'Сохранить статус'}
                         </Button>
-                      </Stack>
-                    </CardContent>
-                  </Card>
+                    </Stack>
+                  </CardContent>
+                </Card>
                 ) : null}
 
                 <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
@@ -2579,6 +2596,7 @@ function StaffQueueSection({
   setSelectedStaffApplicationId,
   setActiveSection,
   updateApplicationStatus,
+  updatingApplicationId,
 }) {
   const [draggedApplicationId, setDraggedApplicationId] = useState('');
   const groupedApplications = useMemo(() => {
@@ -2589,11 +2607,14 @@ function StaffQueueSection({
   }, [applications]);
 
   function handleDragStart(applicationId) {
+    if (updatingApplicationId) {
+      return;
+    }
     setDraggedApplicationId(`${applicationId}`);
   }
 
   function handleDrop(nextStatus, application) {
-    if (!draggedApplicationId) {
+    if (!draggedApplicationId || updatingApplicationId) {
       return;
     }
     if (`${application.status}` === `${nextStatus}`) {
@@ -2614,9 +2635,24 @@ function StaffQueueSection({
             text="Перетаскивайте карточки между колонками статусов. Клик по карточке открывает подробности заявки."
           />
 
-          <Grid container spacing={2}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'nowrap',
+              gap: 2,
+              overflowX: 'auto',
+              pb: 1,
+              alignItems: 'stretch',
+            }}
+          >
             {KANBAN_STATUSES.map((status) => (
-              <Grid item xs={12} sm={6} md={4} xl={2} key={status}>
+              <Box
+                key={status}
+                sx={{
+                  minWidth: 320,
+                  flex: '0 0 320px',
+                }}
+              >
                 <Card
                   variant="outlined"
                   sx={{
@@ -2624,7 +2660,9 @@ function StaffQueueSection({
                     height: '100%',
                     bgcolor: alpha('#fff', 0.85),
                     borderColor: 'divider',
+                    position: 'relative',
                   }}
+                  aria-busy={Boolean(updatingApplicationId)}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => {
                     const application = applications.find((item) => `${item.id}` === draggedApplicationId);
@@ -2650,18 +2688,22 @@ function StaffQueueSection({
                               <Card
                                 key={application.id}
                                 variant="outlined"
-                                draggable
+                                draggable={!updatingApplicationId}
                                 onDragStart={() => handleDragStart(application.id)}
                                 onClick={() => {
+                                  if (updatingApplicationId) {
+                                    return;
+                                  }
                                   setSelectedStaffApplicationId(`${application.id}`);
                                   setActiveSection('application-details');
                                 }}
                                 sx={{
                                   borderRadius: 2,
-                                  cursor: 'pointer',
+                                  cursor: updatingApplicationId ? 'wait' : 'pointer',
                                   borderColor: isSelected ? 'primary.main' : 'divider',
                                   bgcolor: isSelected ? alpha('#1a73e8', 0.08) : 'background.paper',
                                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                                  opacity: updatingApplicationId === `${application.id}` ? 0.75 : 1,
                                   '&:hover': {
                                     transform: 'translateY(-1px)',
                                     boxShadow: '0 6px 18px rgba(60,64,67,0.10)',
@@ -2679,7 +2721,11 @@ function StaffQueueSection({
                                           {application.applicant.fullName}
                                         </Typography>
                                       </Box>
-                                      <StatusChip status={application.status} />
+                                      {updatingApplicationId === `${application.id}` ? (
+                                        <CircularProgress size={22} />
+                                      ) : (
+                                        <StatusChip status={application.status} />
+                                      )}
                                     </Stack>
                                     <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.35 }}>
                                       {application.speciality.code}
@@ -2717,9 +2763,9 @@ function StaffQueueSection({
                     </Stack>
                   </CardContent>
                 </Card>
-              </Grid>
+              </Box>
             ))}
-          </Grid>
+          </Box>
         </Stack>
       </CardContent>
     </Card>
