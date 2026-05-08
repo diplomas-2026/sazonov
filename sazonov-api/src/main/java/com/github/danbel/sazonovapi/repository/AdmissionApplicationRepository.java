@@ -10,4 +10,8 @@ public interface AdmissionApplicationRepository extends JpaRepository<AdmissionA
     List<AdmissionApplication> findByApplicantUsernameOrderByCreatedAtDesc(String username);
 
     List<AdmissionApplication> findByStatusOrderByCreatedAtDesc(ApplicationStatus status);
+
+    boolean existsByApplicantUsernameAndSpecialityId(String username, Long specialityId);
+
+    boolean existsByApplicantUsernameAndSpecialityIdAndIdNot(String username, Long specialityId, Long id);
 }

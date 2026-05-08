@@ -80,6 +80,13 @@ const DOCUMENT_TYPE_LABELS = {
   OTHER: 'Другой документ',
 };
 
+const REQUIRED_APPLICATION_DOCUMENTS = [
+  { value: 'PASSPORT', label: 'Паспорт', hint: 'Скан или фото главной страницы и страницы с регистрацией.' },
+  { value: 'EDUCATION_CERTIFICATE', label: 'Аттестат', hint: 'Копия аттестата об окончании школы или колледжа.' },
+  { value: 'SNILS', label: 'СНИЛС', hint: 'Файл со СНИЛС для проверки данных.' },
+  { value: 'PHOTO', label: 'Фотография', hint: 'Фото абитуриента для личного дела.' },
+];
+
 const STATUS_OPTIONS = [
   { value: 'ALL', label: 'Все заявки' },
   ...Object.keys(STATUS_LABELS).map((value) => ({ value, label: STATUS_LABELS[value] })),
@@ -368,15 +375,6 @@ function App() {
   }, [auth, adminUsers, selectedUserId, creatingUser]);
 
   useEffect(() => {
-    if (!applicationForm.specialityId && publicSpecialities.length > 0) {
-      setApplicationForm((current) => ({
-        ...current,
-        specialityId: `${publicSpecialities[0].id}`,
-      }));
-    }
-  }, [applicationForm.specialityId, publicSpecialities]);
-
-  useEffect(() => {
     if (publicLeaderboard.length > 0) {
       if (!selectedLeaderboardSpecialityId || !publicLeaderboard.some((item) => `${item.specialityId}` === `${selectedLeaderboardSpecialityId}`)) {
         setSelectedLeaderboardSpecialityId(`${publicLeaderboard[0].specialityId}`);
@@ -437,6 +435,33 @@ function App() {
     () => adminDepartments.find((item) => `${item.id}` === `${selectedDepartmentId}`) || null,
     [adminDepartments, selectedDepartmentId],
   );
+
+  const applicantUsedSpecialityIds = useMemo(
+    () => new Set(applicantApplications.map((item) => `${item.speciality?.id || ''}`)),
+    [applicantApplications],
+  );
+
+  const availableSpecialitiesForCreate = useMemo(
+    () => publicSpecialities.filter((speciality) => !applicantUsedSpecialityIds.has(`${speciality.id}`)),
+    [publicSpecialities, applicantUsedSpecialityIds],
+  );
+
+  useEffect(() => {
+    if (!applicationForm.specialityId && availableSpecialitiesForCreate.length > 0) {
+      setApplicationForm((current) => ({
+        ...current,
+        specialityId: `${availableSpecialitiesForCreate[0].id}`,
+      }));
+      return;
+    }
+
+    if (applicationForm.specialityId && !availableSpecialitiesForCreate.some((item) => `${item.id}` === `${applicationForm.specialityId}`)) {
+      setApplicationForm((current) => ({
+        ...current,
+        specialityId: `${availableSpecialitiesForCreate[0]?.id || ''}`,
+      }));
+    }
+  }, [applicationForm.specialityId, availableSpecialitiesForCreate]);
 
   const navigationTabs = useMemo(() => {
     if (!auth) {
@@ -576,6 +601,11 @@ function App() {
     setError('');
     setMessage('');
 
+    if (!availableSpecialitiesForCreate.some((item) => `${item.id}` === `${applicationForm.specialityId}`)) {
+      setError('Эта специальность уже занята. Выберите другую.');
+      return;
+    }
+
     try {
       const created = await api.applicantCreateApplication(auth.token, {
         ...applicationForm,
@@ -611,6 +641,15 @@ function App() {
     setError('');
     setMessage('');
     setSavingApplicationEdit(true);
+
+    if (
+      `${applicationEditForm.specialityId}` !== `${selectedApplicantApplication.speciality?.id || ''}` &&
+      applicantUsedSpecialityIds.has(`${applicationEditForm.specialityId}`)
+    ) {
+      setSavingApplicationEdit(false);
+      setError('Эта специальность уже занята другой вашей заявкой.');
+      return;
+    }
 
     try {
       const updated = await api.applicantUpdateApplication(auth.token, selectedApplicantApplication.id, {
@@ -1271,6 +1310,8 @@ function App() {
               setApplicationCreateDocumentType,
               publicDepartments,
               publicSpecialities,
+              applicantUsedSpecialityIds,
+              availableSpecialitiesForCreate,
               publicLeaderboard,
               applicantApplications,
               selectedApplicantApplication,
@@ -1351,19 +1392,41 @@ function renderActiveSection(props) {
           case 'leaderboard':
             return <LeaderboardSection {...props} />;
           case 'departments':
-            return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
+            return (
+              <DepartmentDirectorySection
+                auth={props.auth}
+                departments={props.publicDepartments}
+                specialities={props.publicSpecialities}
+                applicantApplications={props.applicantApplications}
+                setApplicationForm={props.setApplicationForm}
+                setActiveSection={props.setActiveSection}
+                setSelectedApplicantApplicationId={props.setSelectedApplicantApplicationId}
+              />
+            );
           case 'profile':
           default:
             return <ApplicantProfileSection {...props} />;
         }
       case 'STAFF':
         switch (activeSection) {
+          case 'departments':
+            return (
+              <DepartmentDirectorySection
+                auth={props.auth}
+                departments={props.publicDepartments}
+                specialities={props.publicSpecialities}
+                applicantApplications={props.applicantApplications}
+                setApplicationForm={props.setApplicationForm}
+                setActiveSection={props.setActiveSection}
+                setSelectedApplicantApplicationId={props.setSelectedApplicantApplicationId}
+              />
+            );
           case 'leaderboard':
             return <LeaderboardSection {...props} />;
           case 'queue':
           default:
             return <StaffQueueSection {...props} />;
-      }
+        }
       case 'ADMIN':
         switch (activeSection) {
           case 'applications':
@@ -1487,6 +1550,7 @@ function ApplicantApplicationDetailsSection({
   selectedApplicantApplication,
   selectedApplicantApplicationCanEdit,
   setActiveSection,
+  applicantUsedSpecialityIds,
   publicSpecialities,
   applicationEditForm,
   setApplicationEditForm,
@@ -1542,6 +1606,45 @@ function ApplicantApplicationDetailsSection({
                   </CardContent>
                 </Card>
 
+                {(() => {
+                  const uploadedTypes = new Set((selectedApplicantApplication.documents || []).map((document) => document.type));
+                  const missingRequiredDocuments = REQUIRED_APPLICATION_DOCUMENTS.filter(
+                    (document) => !uploadedTypes.has(document.value),
+                  );
+
+                  return (
+                    <Alert
+                      severity={missingRequiredDocuments.length ? 'warning' : 'success'}
+                      variant="outlined"
+                      sx={{ borderRadius: 2.5 }}
+                    >
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          {missingRequiredDocuments.length
+                            ? 'Нужно обязательно загрузить документы'
+                            : 'Все обязательные документы загружены'}
+                        </Typography>
+                        {missingRequiredDocuments.length ? (
+                          <Stack spacing={1}>
+                            {missingRequiredDocuments.map((document) => (
+                              <Box key={document.value} sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                <Chip size="small" color="warning" variant="outlined" label={document.label} />
+                                <Typography variant="body2" color="text.secondary">
+                                  {document.hint}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2">
+                            Паспорт, аттестат, СНИЛС и фотография уже прикреплены к заявке.
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Alert>
+                  );
+                })()}
+
                 <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
                   <CardContent>
                     <SectionHeader
@@ -1562,11 +1665,21 @@ function ApplicantApplicationDetailsSection({
                         >
                           <MenuItem value="">Выберите специальность</MenuItem>
                           {publicSpecialities.map((speciality) => (
-                            <MenuItem key={speciality.id} value={speciality.id}>
+                            <MenuItem
+                              key={speciality.id}
+                              value={speciality.id}
+                              disabled={
+                                `${speciality.id}` !== `${selectedApplicantApplication.speciality?.id || ''}` &&
+                                applicantUsedSpecialityIds.has(`${speciality.id}`)
+                              }
+                            >
                               {speciality.department?.name || 'Без отделения'} · {speciality.code} · {speciality.name}
                             </MenuItem>
                           ))}
                         </TextField>
+                        <Typography variant="body2" color="text.secondary">
+                          Нельзя выбрать специальность, на которую вы уже подавали заявку.
+                        </Typography>
 
                         <Grid container spacing={2}>
                           <Grid item xs={12} sm={6}>
@@ -1757,7 +1870,7 @@ function ApplicantApplicationCreateSection({
   setApplicationCreateDocuments,
   applicationCreateDocumentType,
   setApplicationCreateDocumentType,
-  publicSpecialities,
+  availableSpecialitiesForCreate,
   handleCreateApplication,
 }) {
   return (
@@ -1772,16 +1885,24 @@ function ApplicantApplicationCreateSection({
             select
             label="Специальность"
             value={applicationForm.specialityId}
-            onChange={(event) => setApplicationForm({ ...applicationForm, specialityId: event.target.value })}
-            fullWidth
-          >
-            <MenuItem value="">Выберите специальность</MenuItem>
-            {publicSpecialities.map((speciality) => (
+                          onChange={(event) => setApplicationForm({ ...applicationForm, specialityId: event.target.value })}
+                          fullWidth
+                        >
+                          <MenuItem value="">Выберите специальность</MenuItem>
+            {availableSpecialitiesForCreate.map((speciality) => (
               <MenuItem key={speciality.id} value={speciality.id}>
                 {speciality.department?.name || 'Без отделения'} · {speciality.code} · {speciality.name}
               </MenuItem>
             ))}
           </TextField>
+          <Typography variant="body2" color="text.secondary">
+            Можно выбрать только свободную специальность. Уже занятые варианты скрыты.
+          </Typography>
+          {!availableSpecialitiesForCreate.length ? (
+            <Alert severity="warning" variant="outlined">
+              У вас уже есть заявка по каждой доступной специальности. Новую заявку создать нельзя.
+            </Alert>
+          ) : null}
           <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
             <CardContent sx={{ p: 2.5 }}>
               <Stack spacing={2}>
@@ -1886,7 +2007,13 @@ function ApplicantApplicationCreateSection({
             minRows={3}
             fullWidth
           />
-          <Button type="submit" variant="contained" startIcon={<CloudUpload />} sx={{ alignSelf: 'flex-start' }}>
+          <Button
+            type="submit"
+            variant="contained"
+            startIcon={<CloudUpload />}
+            sx={{ alignSelf: 'flex-start' }}
+            disabled={!availableSpecialitiesForCreate.length}
+          >
             Отправить заявку
           </Button>
         </Stack>
@@ -2221,7 +2348,15 @@ function ApplicationChatSection({ auth, applicationId, currentUsername, title, t
   );
 }
 
-function DepartmentDirectorySection({ departments, specialities }) {
+function DepartmentDirectorySection({
+  auth,
+  departments,
+  specialities,
+  applicantApplications,
+  setApplicationForm,
+  setActiveSection,
+  setSelectedApplicantApplicationId,
+}) {
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardContent sx={{ p: 3 }}>
@@ -2251,16 +2386,82 @@ function DepartmentDirectorySection({ departments, specialities }) {
                             Специальности
                           </Typography>
                           {departmentSpecialities.length ? (
-                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                              {departmentSpecialities.map((speciality) => (
-                                <Chip
-                                  key={speciality.id}
-                                  label={`${speciality.code} · ${speciality.name}`}
-                                  size="small"
-                                  variant="outlined"
-                                  sx={{ maxWidth: '100%' }}
-                                />
-                              ))}
+                            <Stack spacing={1}>
+                              {departmentSpecialities.map((speciality) => {
+                                const applicantApplication = applicantApplications?.find(
+                                  (item) => `${item.speciality?.id || ''}` === `${speciality.id}`,
+                                );
+                                const isApplicant = auth?.user?.role === 'APPLICANT';
+                                const alreadyApplied = Boolean(applicantApplication);
+
+                                return (
+                                  <Card
+                                    key={speciality.id}
+                                    variant="outlined"
+                                    sx={{
+                                      borderRadius: 2,
+                                      borderColor: alreadyApplied ? 'success.main' : 'divider',
+                                      bgcolor: alreadyApplied ? alpha('#2e7d32', 0.04) : alpha('#fff', 0.7),
+                                    }}
+                                  >
+                                    <CardContent sx={{ py: 1.5, px: 2 }}>
+                                      <Stack spacing={1}>
+                                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                                          <Chip label={speciality.code} size="small" variant="outlined" />
+                                          <Chip label={`${speciality.admissionPlan} мест`} size="small" variant="outlined" />
+                                          {alreadyApplied ? (
+                                            <Chip label="Заявка подана" size="small" color="success" />
+                                          ) : (
+                                            <Chip label="Свободно" size="small" color="default" variant="outlined" />
+                                          )}
+                                        </Stack>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                          {speciality.name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          {speciality.description}
+                                        </Typography>
+                                        {isApplicant ? (
+                                          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                                            {alreadyApplied ? (
+                                              <>
+                                                <Button
+                                                  size="small"
+                                                  variant="outlined"
+                                                  color="success"
+                                                  onClick={() => {
+                                                    setSelectedApplicantApplicationId(`${applicantApplication.id}`);
+                                                    setActiveSection('application-details');
+                                                  }}
+                                                >
+                                                  Открыть заявку
+                                                </Button>
+                                                <Typography variant="caption" color="success.main" sx={{ alignSelf: 'center', fontWeight: 700 }}>
+                                                  Уже подана на эту специальность
+                                                </Typography>
+                                              </>
+                                            ) : (
+                                              <Button
+                                                size="small"
+                                                variant="contained"
+                                                onClick={() => {
+                                                  setApplicationForm((current) => ({
+                                                    ...current,
+                                                    specialityId: `${speciality.id}`,
+                                                  }));
+                                                  setActiveSection('application-create');
+                                                }}
+                                              >
+                                                Подать заявку
+                                              </Button>
+                                            )}
+                                          </Stack>
+                                        ) : null}
+                                      </Stack>
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })}
                             </Stack>
                           ) : (
                             <Typography variant="body2" color="text.secondary">

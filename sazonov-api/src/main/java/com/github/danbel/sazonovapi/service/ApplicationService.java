@@ -38,6 +38,9 @@ public class ApplicationService {
         AppUser user = currentUser(authentication);
         Speciality speciality = specialityRepository.findById(request.specialityId())
             .orElseThrow(() -> new IllegalArgumentException("Специальность не найдена"));
+        if (applicationRepository.existsByApplicantUsernameAndSpecialityId(user.getUsername(), speciality.getId())) {
+            throw new IllegalStateException("Вы уже подали заявку на эту специальность");
+        }
 
         AdmissionApplication application = new AdmissionApplication();
         application.setApplicant(user);
@@ -69,6 +72,9 @@ public class ApplicationService {
 
         Speciality speciality = specialityRepository.findById(request.specialityId())
             .orElseThrow(() -> new IllegalArgumentException("Специальность не найдена"));
+        if (applicationRepository.existsByApplicantUsernameAndSpecialityIdAndIdNot(user.getUsername(), speciality.getId(), application.getId())) {
+            throw new IllegalStateException("Вы уже подали заявку на эту специальность");
+        }
 
         application.setSpeciality(speciality);
         application.setPassportSeries(request.passportSeries().trim());
