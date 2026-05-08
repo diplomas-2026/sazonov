@@ -10,6 +10,7 @@ import com.github.danbel.sazonovapi.repository.AdmissionApplicationRepository;
 import com.github.danbel.sazonovapi.repository.SpecialityRepository;
 import java.util.Comparator;
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,7 @@ public class LeaderboardService {
                     .filter(application -> application.getSpeciality().getId().equals(speciality.getId()))
                     .filter(application -> application.getStatus() == ApplicationStatus.ACCEPTED)
                     .sorted(Comparator
-                        .comparing(AdmissionApplication::getPoints, Comparator.reverseOrder())
+                        .comparing(AdmissionApplication::getPoints, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(AdmissionApplication::getCreatedAt)
                         .thenComparing(AdmissionApplication::getId))
                     .toList();

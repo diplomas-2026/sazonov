@@ -29,6 +29,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional
 public class ApplicationService {
 
+    private static final long MAX_UPLOAD_SIZE_BYTES = 5L * 1024L * 1024L;
+
     private final AdmissionApplicationRepository applicationRepository;
     private final ApplicationDocumentRepository documentRepository;
     private final AppUserRepository userRepository;
@@ -156,6 +158,9 @@ public class ApplicationService {
         }
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Файл пустой");
+        }
+        if (file.getSize() > MAX_UPLOAD_SIZE_BYTES) {
+            throw new IllegalArgumentException("Файл не должен превышать 5 МБ");
         }
 
         ApplicationDocument document = new ApplicationDocument();

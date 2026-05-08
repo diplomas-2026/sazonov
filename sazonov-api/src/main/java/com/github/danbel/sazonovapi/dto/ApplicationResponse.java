@@ -3,6 +3,7 @@ package com.github.danbel.sazonovapi.dto;
 import com.github.danbel.sazonovapi.domain.ApplicationStatus;
 import java.time.Instant;
 import java.util.List;
+import java.math.BigDecimal;
 
 public record ApplicationResponse(
     Long id,
@@ -15,7 +16,7 @@ public record ApplicationResponse(
     String educationDocumentNumber,
     String graduationSchool,
     Integer graduationYear,
-    Integer points,
+    BigDecimal points,
     String applicantComment,
     String staffComment,
     Instant createdAt,

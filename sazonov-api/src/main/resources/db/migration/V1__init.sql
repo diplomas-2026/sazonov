@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS admission_applications (
     education_document_number VARCHAR(255) NOT NULL,
     graduation_school VARCHAR(255) NOT NULL,
     graduation_year INTEGER NOT NULL,
-    points INTEGER NOT NULL,
+    points NUMERIC(3,2) NOT NULL,
     applicant_comment VARCHAR(2000),
     staff_comment VARCHAR(2000),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,

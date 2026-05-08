@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
@@ -58,8 +59,8 @@ public class AdmissionApplication {
     @Column(nullable = false)
     private Integer graduationYear;
 
-    @Column(nullable = false)
-    private Integer points;
+    @Column(nullable = false, precision = 3, scale = 2)
+    private BigDecimal points;
 
     @Column(length = 2000)
     private String applicantComment;

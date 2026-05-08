@@ -93,8 +93,8 @@ const KANBAN_STATUSES = ['SUBMITTED', 'UNDER_REVIEW', 'MISSING_DOCS', 'ACCEPTED'
 const APPLICATION_SORT_OPTIONS = [
   { value: 'newest', label: 'Сначала новые' },
   { value: 'oldest', label: 'Сначала старые' },
-  { value: 'points_desc', label: 'По баллу: больше к меньшему' },
-  { value: 'points_asc', label: 'По баллу: меньше к большему' },
+  { value: 'points_desc', label: 'По среднему баллу: больше к меньшему' },
+  { value: 'points_asc', label: 'По среднему баллу: меньше к большему' },
   { value: 'name_asc', label: 'По ФИО: А-Я' },
 ];
 
@@ -102,6 +102,46 @@ const APPLICATION_STATUS_FILTER_OPTIONS = [
   { value: 'ALL', label: 'Все статусы' },
   ...KANBAN_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
 ];
+
+const AVERAGE_SCORE_MIN = 2;
+const AVERAGE_SCORE_MAX = 5;
+const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_UPLOAD_SIZE_LABEL = '5 МБ';
+const MAX_UPLOAD_FILES_PER_BATCH = 5;
+
+function normalizeAverageScoreInput(value) {
+  return `${value ?? ''}`.trim().replace(',', '.');
+}
+
+function parseAverageScoreInput(value) {
+  const normalized = normalizeAverageScoreInput(value);
+  if (!normalized) {
+    return Number.NaN;
+  }
+  return Number(normalized);
+}
+
+function formatAverageScore(value) {
+  if (value === null || value === undefined || value === '') {
+    return '—';
+  }
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return '—';
+  }
+  return numericValue.toLocaleString('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function isFileWithinLimit(file) {
+  return file && file.size <= MAX_UPLOAD_SIZE_BYTES;
+}
+
+function getFileSizeLimitMessage(file) {
+  return `Файл «${file.name}» превышает ${MAX_UPLOAD_SIZE_LABEL}. Выберите файл меньше или равный ${MAX_UPLOAD_SIZE_LABEL}.`;
+}
 
 function getApplicationSearchText(application) {
   return [
@@ -164,12 +204,16 @@ const emptyApplication = {
   educationDocumentNumber: '',
   graduationSchool: '',
   graduationYear: new Date().getFullYear(),
-  points: 0,
+  points: '',
   applicantComment: '',
 };
 
 const emptyApplicationEdit = {
   ...emptyApplication,
+};
+
+const emptyApplicationErrors = {
+  points: '',
 };
 
 const emptyDepartment = {
@@ -233,6 +277,8 @@ function App() {
   const [profileForm, setProfileForm] = useState(emptyProfile);
   const [applicationForm, setApplicationForm] = useState(emptyApplication);
   const [applicationEditForm, setApplicationEditForm] = useState(emptyApplicationEdit);
+  const [applicationFormErrors, setApplicationFormErrors] = useState(emptyApplicationErrors);
+  const [applicationEditErrors, setApplicationEditErrors] = useState(emptyApplicationErrors);
   const [applicationCreateDocuments, setApplicationCreateDocuments] = useState([]);
   const [applicationCreateDocumentType, setApplicationCreateDocumentType] = useState('PASSPORT');
   const [departmentForm, setDepartmentForm] = useState(emptyDepartment);
@@ -482,11 +528,13 @@ function App() {
         educationDocumentNumber: selectedApplicantApplication.educationDocumentNumber || '',
         graduationSchool: selectedApplicantApplication.graduationSchool || '',
         graduationYear: selectedApplicantApplication.graduationYear || new Date().getFullYear(),
-        points: selectedApplicantApplication.points ?? 0,
+        points: selectedApplicantApplication.points ?? '',
         applicantComment: selectedApplicantApplication.applicantComment || '',
       });
+      setApplicationEditErrors(emptyApplicationErrors);
     } else {
       setApplicationEditForm(emptyApplicationEdit);
+      setApplicationEditErrors(emptyApplicationErrors);
     }
   }, [selectedApplicantApplication]);
 
@@ -642,7 +690,10 @@ function App() {
     setPublicLeaderboard([]);
     setApplicationCreateDocuments([]);
     setApplicationCreateDocumentType('PASSPORT');
+    setApplicationForm(emptyApplication);
     setApplicationEditForm(emptyApplicationEdit);
+    setApplicationFormErrors(emptyApplicationErrors);
+    setApplicationEditErrors(emptyApplicationErrors);
     setSelectedApplicantApplicationId('');
     setSelectedStaffApplicationId('');
     setSelectedLeaderboardSpecialityId('');
@@ -670,6 +721,29 @@ function App() {
       nextErrors.name = 'Укажите название отделения';
     }
     setDepartmentErrors(nextErrors);
+    return !Object.values(nextErrors).some(Boolean);
+  }
+
+  function validateApplicationPoints(form, setNextErrors) {
+    const nextErrors = { ...emptyApplicationErrors };
+    const normalizedPoints = normalizeAverageScoreInput(form.points);
+
+    if (!normalizedPoints) {
+      nextErrors.points = 'Укажите средний балл от 2 до 5';
+      setNextErrors(nextErrors);
+      return false;
+    }
+
+    const points = Number(normalizedPoints);
+    if (!Number.isFinite(points)) {
+      nextErrors.points = 'Введите число от 2 до 5';
+    } else if (points < AVERAGE_SCORE_MIN || points > AVERAGE_SCORE_MAX) {
+      nextErrors.points = 'Средний балл должен быть от 2 до 5';
+    } else if ((normalizedPoints.split('.')[1] || '').length > 2) {
+      nextErrors.points = 'Можно указать не более 2 знаков после запятой';
+    }
+
+    setNextErrors(nextErrors);
     return !Object.values(nextErrors).some(Boolean);
   }
 
@@ -749,8 +823,18 @@ function App() {
     setError('');
     setMessage('');
 
+    if (!validateApplicationPoints(applicationForm, setApplicationFormErrors)) {
+      return;
+    }
+
     if (!availableSpecialitiesForCreate.some((item) => `${item.id}` === `${applicationForm.specialityId}`)) {
       setError('Эта специальность уже занята. Выберите другую.');
+      return;
+    }
+
+    const oversizedFile = applicationCreateDocuments.find((file) => !isFileWithinLimit(file));
+    if (oversizedFile) {
+      setError(getFileSizeLimitMessage(oversizedFile));
       return;
     }
 
@@ -759,10 +843,13 @@ function App() {
         ...applicationForm,
         specialityId: Number(applicationForm.specialityId),
         graduationYear: Number(applicationForm.graduationYear),
-        points: Number(applicationForm.points),
+        points: Number(parseAverageScoreInput(applicationForm.points).toFixed(2)),
       });
 
       for (const file of applicationCreateDocuments) {
+        if (!isFileWithinLimit(file)) {
+          throw new Error(getFileSizeLimitMessage(file));
+        }
         await api.uploadDocument(auth.token, created.id, applicationCreateDocumentType, file);
       }
 
@@ -771,6 +858,7 @@ function App() {
         ...emptyApplication,
         specialityId: applicationForm.specialityId || `${publicSpecialities[0]?.id || ''}`,
       });
+      setApplicationFormErrors(emptyApplicationErrors);
       setApplicationCreateDocuments([]);
       setApplicationCreateDocumentType('PASSPORT');
       const applications = await api.applicantApplications(auth.token);
@@ -790,6 +878,11 @@ function App() {
     setMessage('');
     setSavingApplicationEdit(true);
 
+    if (!validateApplicationPoints(applicationEditForm, setApplicationEditErrors)) {
+      setSavingApplicationEdit(false);
+      return;
+    }
+
     if (
       `${applicationEditForm.specialityId}` !== `${selectedApplicantApplication.speciality?.id || ''}` &&
       applicantUsedSpecialityIds.has(`${applicationEditForm.specialityId}`)
@@ -804,12 +897,13 @@ function App() {
         ...applicationEditForm,
         specialityId: Number(applicationEditForm.specialityId),
         graduationYear: Number(applicationEditForm.graduationYear),
-        points: Number(applicationEditForm.points),
+        points: Number(parseAverageScoreInput(applicationEditForm.points).toFixed(2)),
       });
 
       const applications = await api.applicantApplications(auth.token);
       setApplicantApplications(applications);
       setSelectedApplicantApplicationId(`${updated.id}`);
+      setApplicationEditErrors(emptyApplicationErrors);
       setMessage(`Заявка №${updated.id} обновлена`);
       setActiveSection('application-details');
     } catch (nextError) {
@@ -846,10 +940,14 @@ function App() {
   async function handleUploadDocument(event) {
     event.preventDefault();
     if (!auth || !selectedApplicantApplicationId) return;
-    const file = event.currentTarget.elements.file?.files?.[0];
+    const files = Array.from(event.currentTarget.elements.documentFiles?.files || []);
     const type = event.currentTarget.elements.type?.value;
-    if (!file) {
-      setError('Выберите файл');
+    if (!files.length) {
+      setError('Выберите от 1 до 5 файлов');
+      return;
+    }
+    if (files.length > MAX_UPLOAD_FILES_PER_BATCH) {
+      setError(`Можно загрузить не больше ${MAX_UPLOAD_FILES_PER_BATCH} файлов за раз`);
       return;
     }
 
@@ -857,10 +955,16 @@ function App() {
     setMessage('');
 
     try {
-      await api.uploadDocument(auth.token, selectedApplicantApplicationId, type, file);
+      const oversizedFile = files.find((file) => !isFileWithinLimit(file));
+      if (oversizedFile) {
+        throw new Error(getFileSizeLimitMessage(oversizedFile));
+      }
+      for (const file of files) {
+        await api.uploadDocument(auth.token, selectedApplicantApplicationId, type, file);
+      }
       const applications = await api.applicantApplications(auth.token);
       setApplicantApplications(applications);
-      setMessage('Документ загружен');
+      setMessage(files.length === 1 ? 'Документ загружен' : `Загружено файлов: ${files.length}`);
       event.currentTarget.reset();
     } catch (nextError) {
       setError(nextError.message);
@@ -1345,6 +1449,8 @@ function App() {
               handleSaveProfile,
               applicationForm,
               setApplicationForm,
+              applicationFormErrors,
+              setError,
               applicationCreateDocuments,
               setApplicationCreateDocuments,
               applicationCreateDocumentType,
@@ -1369,6 +1475,7 @@ function App() {
               handleDownloadDocument,
               applicationEditForm,
               setApplicationEditForm,
+              applicationEditErrors,
               savingApplicationEdit,
               cancellingApplication,
               updateApplicationStatus,
@@ -1851,6 +1958,7 @@ function ApplicantApplicationDetailsSection({
   publicSpecialities,
   applicationEditForm,
   setApplicationEditForm,
+  applicationEditErrors,
   handleUpdateApplication,
   handleCancelApplication,
   handleStaffStatusSave,
@@ -1943,7 +2051,7 @@ function ApplicantApplicationDetailsSection({
                         <InfoTile label="СНИЛС" value={selectedApplicantApplication.snils} />
                         <InfoTile label="Аттестат" value={selectedApplicantApplication.educationDocumentNumber} />
                         <InfoTile label="Школа" value={selectedApplicantApplication.graduationSchool} />
-                        <InfoTile label="Средний балл в аттестате" value={selectedApplicantApplication.points} />
+                        <InfoTile label="Средний балл в аттестате" value={formatAverageScore(selectedApplicantApplication.points)} />
                         <InfoTile label="Комментарий сотрудника" value={selectedApplicantApplication.staffComment || 'Пока нет замечаний'} />
                       </Grid>
                     </Stack>
@@ -2090,15 +2198,19 @@ function ApplicantApplicationDetailsSection({
                               />
                             </Grid>
                             <Grid item xs={12} sm={6}>
-                              <TextField
-                                label="Средний балл в аттестате"
-                                type="number"
-                                value={applicationEditForm.points}
-                                onChange={(event) =>
-                                  setApplicationEditForm({ ...applicationEditForm, points: event.target.value })
-                                }
-                                fullWidth
-                              />
+                            <TextField
+                              label="Средний балл в аттестате"
+                              type="text"
+                              inputMode="decimal"
+                              value={applicationEditForm.points}
+                              onChange={(event) =>
+                                setApplicationEditForm({ ...applicationEditForm, points: event.target.value })
+                              }
+                              error={Boolean(applicationEditErrors.points)}
+                              helperText={applicationEditErrors.points || 'Допустимо значение от 2.00 до 5.00'}
+                              inputProps={{ min: AVERAGE_SCORE_MIN, max: AVERAGE_SCORE_MAX, step: '0.01' }}
+                              fullWidth
+                            />
                             </Grid>
                             <Grid item xs={12}>
                               <TextField
@@ -2181,11 +2293,20 @@ function ApplicantApplicationDetailsSection({
                               startIcon={<CloudUpload />}
                               sx={{ height: '56px', width: '100%', justifyContent: 'flex-start' }}
                             >
-                              Выбрать файл
-                              <input name="file" type="file" hidden />
+                              Выбрать файлы
+                              <input
+                                name="documentFiles"
+                                type="file"
+                                hidden
+                                multiple
+                                accept="image/*,.pdf,.doc,.docx,.jpg,.jpeg,.png"
+                              />
                             </Button>
                           </Grid>
                         </Grid>
+                        <Typography variant="caption" color="text.secondary">
+                          Максимум {MAX_UPLOAD_FILES_PER_BATCH} файлов за раз, каждый до {MAX_UPLOAD_SIZE_LABEL}
+                        </Typography>
                         <Button type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>
                           Загрузить
                         </Button>
@@ -2215,6 +2336,8 @@ function ApplicantApplicationDetailsSection({
 function ApplicantApplicationCreateSection({
   applicationForm,
   setApplicationForm,
+  applicationFormErrors,
+  setError,
   applicationCreateDocuments,
   setApplicationCreateDocuments,
   applicationCreateDocumentType,
@@ -2278,13 +2401,23 @@ function ApplicantApplicationCreateSection({
                     type="file"
                     hidden
                     multiple
-                    onChange={(event) => setApplicationCreateDocuments(Array.from(event.target.files || []))}
+                    accept="image/*,.pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(event) => {
+                      const nextFiles = Array.from(event.target.files || []);
+                      const tooLargeFile = nextFiles.find((file) => !isFileWithinLimit(file));
+                      if (tooLargeFile) {
+                        setError(getFileSizeLimitMessage(tooLargeFile));
+                      } else {
+                        setError('');
+                      }
+                      setApplicationCreateDocuments(nextFiles.filter(isFileWithinLimit));
+                    }}
                   />
                 </Button>
                 <Typography variant="body2" color="text.secondary">
                   {applicationCreateDocuments.length
                     ? `Выбрано файлов: ${applicationCreateDocuments.length}`
-                    : 'Файлы можно прикрепить сразу при создании заявки.'}
+                    : `Файлы можно прикрепить сразу при создании заявки. Максимум ${MAX_UPLOAD_SIZE_LABEL} на файл.`}
                 </Typography>
                 {applicationCreateDocuments.length ? (
                   <Stack spacing={0.5}>
@@ -2339,13 +2472,17 @@ function ApplicantApplicationCreateSection({
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                label="Средний балл в аттестате"
-                type="number"
-                value={applicationForm.points}
-                onChange={(event) => setApplicationForm({ ...applicationForm, points: event.target.value })}
-                fullWidth
-              />
+                <TextField
+                  label="Средний балл в аттестате"
+                  type="text"
+                  inputMode="decimal"
+                  value={applicationForm.points}
+                  onChange={(event) => setApplicationForm({ ...applicationForm, points: event.target.value })}
+                  error={Boolean(applicationFormErrors.points)}
+                  helperText={applicationFormErrors.points || 'Допустимо значение от 2.00 до 5.00'}
+                  inputProps={{ min: AVERAGE_SCORE_MIN, max: AVERAGE_SCORE_MAX, step: '0.01' }}
+                  fullWidth
+                />
             </Grid>
           </Grid>
           <TextField
@@ -2492,7 +2629,7 @@ function LeaderboardSection({
                                   Средний балл
                                 </Typography>
                                 <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                  {entry.points}
+                                  {formatAverageScore(entry.points)}
                                 </Typography>
                               </Stack>
                             </Grid>
@@ -3045,7 +3182,7 @@ function StaffQueueSection({
                                       {application.speciality.name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                      {application.points} балл
+                                      Средний балл: {formatAverageScore(application.points)}
                                     </Typography>
                                   </Stack>
                                 </CardContent>
