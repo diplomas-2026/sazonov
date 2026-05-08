@@ -1124,33 +1124,6 @@ function App() {
           </Grid>
         ) : (
           <Stack spacing={3}>
-            <Card variant="outlined" sx={{ borderRadius: 3 }}>
-              <CardContent sx={{ p: 3 }}>
-                <Grid container spacing={2} alignItems="stretch">
-                  <Grid item xs={12} md={5}>
-                    <Stack spacing={1}>
-                      <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: 0.6 }}>
-                        В системе
-                      </Typography>
-                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                        {auth.user.fullName}
-                      </Typography>
-                      <Typography color="text.secondary">
-                        {ROLE_LABELS[auth.user.role]} · {auth.user.username}
-                      </Typography>
-                    </Stack>
-                  </Grid>
-                  <Grid item xs={12} md={7}>
-                    <Grid container spacing={2}>
-                      <MetricCard label="Моя роль" value={ROLE_LABELS[auth.user.role]} />
-                      <MetricCard label="Специальностей" value={publicSpecialities.length} />
-                      <MetricCard label="Заявок" value={publicDashboard?.totalApplications || 0} />
-                    </Grid>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-
             {renderActiveSection({
               auth,
               activeSection,
