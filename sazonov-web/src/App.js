@@ -551,7 +551,7 @@ function App() {
       return;
     }
 
-    const internalSections = new Set(['application-details', 'application-create', 'department-form', 'user-form']);
+    const internalSections = new Set(['application-details', 'application-create', 'department-form', 'user-form', 'speciality-form']);
 
     if (navigationTabs.length === 0) {
       setActiveSection('');
@@ -969,7 +969,7 @@ function App() {
       paidPlaces: speciality.paidPlaces,
       admissionPlan: speciality.admissionPlan,
     });
-    setActiveSection('specialities');
+    setActiveSection('speciality-form');
   }
 
   function selectUserForEditing(user) {
@@ -994,7 +994,7 @@ function App() {
       ...emptySpeciality,
       departmentId: selectedDepartment?.id ? `${selectedDepartment.id}` : `${adminDepartments[0]?.id || ''}`,
     });
-    setActiveSection('specialities');
+    setActiveSection('speciality-form');
   }
 
   async function handleDepartmentSave(event) {
@@ -1390,6 +1390,8 @@ function renderActiveSection(props) {
             return <AdminDepartmentFormSection {...props} />;
           case 'specialities':
             return <AdminSpecialitiesSection {...props} />;
+          case 'speciality-form':
+            return <AdminSpecialityFormSection {...props} />;
           case 'application-details':
             return (
               <ApplicantApplicationDetailsSection
@@ -3114,11 +3116,63 @@ function AdminDepartmentFormSection({
 function AdminSpecialitiesSection({
   adminDepartments,
   adminSpecialities,
-  specialityForm,
-  setSpecialityForm,
   selectedAdminSpeciality,
   selectSpecialityForEditing,
   startNewSpeciality,
+}) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
+          <SectionHeader
+            title="Специальности"
+            text="Откройте специальность, чтобы редактировать её на отдельной странице."
+          />
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Button variant="contained" startIcon={<Add />} onClick={startNewSpeciality}>
+              Новая специальность
+            </Button>
+          </Stack>
+
+          <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+            {adminSpecialities.map((speciality) => (
+              <ListItemButton
+                key={speciality.id}
+                selected={selectedAdminSpeciality?.id === speciality.id}
+                onClick={() => selectSpecialityForEditing(speciality)}
+                sx={{ alignItems: 'flex-start', py: 1.5 }}
+              >
+                <ListItemText
+                  primary={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        {speciality.code}
+                      </Typography>
+                      <Chip size="small" variant="outlined" label="Открыть" />
+                    </Stack>
+                  }
+                  secondary={`${speciality.department?.name || 'Без отделения'} · ${speciality.name}`}
+                />
+              </ListItemButton>
+            ))}
+            {!adminSpecialities.length ? (
+              <Box sx={{ p: 2 }}>
+                <EmptyState title="Специальностей пока нет" text="Создайте первую специальность и привяжите её к отделению." />
+              </Box>
+            ) : null}
+          </List>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AdminSpecialityFormSection({
+  adminDepartments,
+  specialityForm,
+  setSpecialityForm,
+  selectedAdminSpeciality,
+  setActiveSection,
   handleSpecialitySave,
   handleDeleteSpeciality,
   primaryActionLabel,
@@ -3128,125 +3182,99 @@ function AdminSpecialitiesSection({
       <CardContent sx={{ p: 3 }}>
         <Stack spacing={2.5}>
           <SectionHeader
-            title="Специальности"
-            text="Создавайте и редактируйте специальности внутри отделений."
+            title={selectedAdminSpeciality ? 'Редактирование специальности' : 'Новая специальность'}
+            text="Заполните данные специальности и сохраните изменения."
           />
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Button variant="outlined" startIcon={<Add />} onClick={startNewSpeciality}>
-              Новая специальность
+            <Button variant="outlined" onClick={() => setActiveSection('specialities')}>
+              Назад к специальностям
             </Button>
           </Stack>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={5}>
-              <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                {adminSpecialities.map((speciality) => (
-                  <ListItemButton
-                    key={speciality.id}
-                    selected={selectedAdminSpeciality?.id === speciality.id}
-                    onClick={() => selectSpecialityForEditing(speciality)}
-                    sx={{ alignItems: 'flex-start', py: 1.5 }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          {speciality.code}
-                        </Typography>
-                      }
-                      secondary={`${speciality.department?.name || 'Без отделения'} · ${speciality.name}`}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
+          <Stack component="form" spacing={2} onSubmit={handleSpecialitySave}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  select
+                  label="Отделение"
+                  value={specialityForm.departmentId}
+                  onChange={(event) => setSpecialityForm({ ...specialityForm, departmentId: event.target.value })}
+                  fullWidth
+                >
+                  <MenuItem value="">Выберите отделение</MenuItem>
+                  {adminDepartments.map((department) => (
+                    <MenuItem key={department.id} value={department.id}>
+                      {department.code} · {department.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Код"
+                  value={specialityForm.code}
+                  onChange={(event) => setSpecialityForm({ ...specialityForm, code: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Название"
+                  value={specialityForm.name}
+                  onChange={(event) => setSpecialityForm({ ...specialityForm, name: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Бюджетные места"
+                  type="number"
+                  value={specialityForm.budgetPlaces}
+                  onChange={(event) => setSpecialityForm({ ...specialityForm, budgetPlaces: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Платные места"
+                  type="number"
+                  value={specialityForm.paidPlaces}
+                  onChange={(event) => setSpecialityForm({ ...specialityForm, paidPlaces: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="План приема"
+                  type="number"
+                  value={specialityForm.admissionPlan}
+                  onChange={(event) => setSpecialityForm({ ...specialityForm, admissionPlan: event.target.value })}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Описание"
+                  value={specialityForm.description}
+                  onChange={(event) => setSpecialityForm({ ...specialityForm, description: event.target.value })}
+                  multiline
+                  minRows={4}
+                  fullWidth
+                />
+              </Grid>
             </Grid>
 
-            <Grid item xs={12} md={7}>
-              <Stack component="form" spacing={2} onSubmit={handleSpecialitySave}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <TextField
-                      select
-                      label="Отделение"
-                      value={specialityForm.departmentId}
-                      onChange={(event) => setSpecialityForm({ ...specialityForm, departmentId: event.target.value })}
-                      fullWidth
-                    >
-                      <MenuItem value="">Выберите отделение</MenuItem>
-                      {adminDepartments.map((department) => (
-                        <MenuItem key={department.id} value={department.id}>
-                          {department.code} · {department.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Код"
-                      value={specialityForm.code}
-                      onChange={(event) => setSpecialityForm({ ...specialityForm, code: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Название"
-                      value={specialityForm.name}
-                      onChange={(event) => setSpecialityForm({ ...specialityForm, name: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Бюджетные места"
-                      type="number"
-                      value={specialityForm.budgetPlaces}
-                      onChange={(event) => setSpecialityForm({ ...specialityForm, budgetPlaces: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Платные места"
-                      type="number"
-                      value={specialityForm.paidPlaces}
-                      onChange={(event) => setSpecialityForm({ ...specialityForm, paidPlaces: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="План приема"
-                      type="number"
-                      value={specialityForm.admissionPlan}
-                      onChange={(event) => setSpecialityForm({ ...specialityForm, admissionPlan: event.target.value })}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Описание"
-                      value={specialityForm.description}
-                      onChange={(event) => setSpecialityForm({ ...specialityForm, description: event.target.value })}
-                      multiline
-                      minRows={4}
-                      fullWidth
-                    />
-                  </Grid>
-                </Grid>
-
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  <Button type="submit" variant="contained">
-                    {primaryActionLabel}
-                  </Button>
-                  {selectedAdminSpeciality ? (
-                    <Button type="button" color="error" variant="outlined" onClick={handleDeleteSpeciality} startIcon={<DeleteOutline />}>
-                      Удалить специальность
-                    </Button>
-                  ) : null}
-                </Stack>
-              </Stack>
-            </Grid>
-          </Grid>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Button type="submit" variant="contained">
+                {primaryActionLabel}
+              </Button>
+              {selectedAdminSpeciality ? (
+                <Button type="button" color="error" variant="outlined" onClick={handleDeleteSpeciality} startIcon={<DeleteOutline />}>
+                  Удалить специальность
+                </Button>
+              ) : null}
+            </Stack>
+          </Stack>
         </Stack>
       </CardContent>
     </Card>
