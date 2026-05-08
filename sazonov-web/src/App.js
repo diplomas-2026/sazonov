@@ -34,6 +34,7 @@ import {
   Download,
   Edit,
   Description,
+  EmojiEvents,
   Login,
   Logout,
   ManageAccounts,
@@ -141,6 +142,8 @@ function App() {
   const [registerForm, setRegisterForm] = useState(emptyRegister);
   const [profileForm, setProfileForm] = useState(emptyProfile);
   const [applicationForm, setApplicationForm] = useState(emptyApplication);
+  const [applicationCreateDocuments, setApplicationCreateDocuments] = useState([]);
+  const [applicationCreateDocumentType, setApplicationCreateDocumentType] = useState('PASSPORT');
   const [departmentForm, setDepartmentForm] = useState(emptyDepartment);
   const [specialityForm, setSpecialityForm] = useState(emptySpeciality);
   const [userForm, setUserForm] = useState(emptyUser);
@@ -148,6 +151,7 @@ function App() {
   const [publicDepartments, setPublicDepartments] = useState([]);
   const [publicSpecialities, setPublicSpecialities] = useState([]);
   const [publicDashboard, setPublicDashboard] = useState(null);
+  const [publicLeaderboard, setPublicLeaderboard] = useState([]);
   const [applicantApplications, setApplicantApplications] = useState([]);
   const [staffApplications, setStaffApplications] = useState([]);
   const [staffFilter, setStaffFilter] = useState('ALL');
@@ -158,6 +162,7 @@ function App() {
 
   const [selectedApplicantApplicationId, setSelectedApplicantApplicationId] = useState('');
   const [selectedStaffApplicationId, setSelectedStaffApplicationId] = useState('');
+  const [selectedLeaderboardSpecialityId, setSelectedLeaderboardSpecialityId] = useState('');
   const [selectedSpecialityId, setSelectedSpecialityId] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
@@ -168,14 +173,16 @@ function App() {
 
   const loadPublic = useCallback(async () => {
     try {
-      const [departments, specialities, dashboard] = await Promise.all([
+      const [departments, specialities, dashboard, leaderboard] = await Promise.all([
         api.publicDepartments(),
         api.publicSpecialities(),
         api.publicDashboard(),
+        api.publicLeaderboard(),
       ]);
       setPublicDepartments(departments);
       setPublicSpecialities(specialities);
       setPublicDashboard(dashboard);
+      setPublicLeaderboard(leaderboard.specialities || []);
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -229,14 +236,16 @@ function App() {
 
     (async () => {
       try {
-        const [departments, specialities, dashboard] = await Promise.all([
+        const [departments, specialities, dashboard, leaderboard] = await Promise.all([
           api.publicDepartments(),
           api.publicSpecialities(),
           api.publicDashboard(),
+          api.publicLeaderboard(),
         ]);
         setPublicDepartments(departments);
         setPublicSpecialities(specialities);
         setPublicDashboard(dashboard);
+        setPublicLeaderboard(leaderboard.specialities || []);
 
         if (!stored?.token) {
           return;
@@ -470,6 +479,8 @@ function App() {
     setAdminSpecialities([]);
     setAdminDashboard(null);
     setPublicDepartments([]);
+    setApplicationCreateDocuments([]);
+    setApplicationCreateDocumentType('PASSPORT');
     setSelectedApplicantApplicationId('');
     setSelectedStaffApplicationId('');
     setSelectedSpecialityId('');
@@ -509,11 +520,18 @@ function App() {
         graduationYear: Number(applicationForm.graduationYear),
         points: Number(applicationForm.points),
       });
+
+      for (const file of applicationCreateDocuments) {
+        await api.uploadDocument(auth.token, created.id, applicationCreateDocumentType, file);
+      }
+
       setMessage(`Заявка №${created.id} создана`);
       setApplicationForm({
         ...emptyApplication,
         specialityId: applicationForm.specialityId || `${publicSpecialities[0]?.id || ''}`,
       });
+      setApplicationCreateDocuments([]);
+      setApplicationCreateDocumentType('PASSPORT');
       const applications = await api.applicantApplications(auth.token);
       setApplicantApplications(applications);
       setSelectedApplicantApplicationId(`${created.id}`);
@@ -1132,6 +1150,10 @@ function App() {
               handleSaveProfile,
               applicationForm,
               setApplicationForm,
+              applicationCreateDocuments,
+              setApplicationCreateDocuments,
+              applicationCreateDocumentType,
+              setApplicationCreateDocumentType,
               publicDepartments,
               publicSpecialities,
               applicantApplications,
@@ -1381,7 +1403,7 @@ function ApplicantApplicationDetailsSection({
                         <InfoTile label="СНИЛС" value={selectedApplicantApplication.snils} />
                         <InfoTile label="Аттестат" value={selectedApplicantApplication.educationDocumentNumber} />
                         <InfoTile label="Школа" value={selectedApplicantApplication.graduationSchool} />
-                        <InfoTile label="Баллы" value={selectedApplicantApplication.points} />
+                        <InfoTile label="Средний балл в аттестате" value={selectedApplicantApplication.points} />
                         <InfoTile label="Комментарий сотрудника" value={selectedApplicantApplication.staffComment || 'Пока нет замечаний'} />
                       </Grid>
                     </Stack>
@@ -1450,7 +1472,16 @@ function ApplicantApplicationDetailsSection({
   );
 }
 
-function ApplicantApplicationCreateSection({ applicationForm, setApplicationForm, publicSpecialities, handleCreateApplication }) {
+function ApplicantApplicationCreateSection({
+  applicationForm,
+  setApplicationForm,
+  applicationCreateDocuments,
+  setApplicationCreateDocuments,
+  applicationCreateDocumentType,
+  setApplicationCreateDocumentType,
+  publicSpecialities,
+  handleCreateApplication,
+}) {
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardContent sx={{ p: 3 }}>
@@ -1458,7 +1489,7 @@ function ApplicantApplicationCreateSection({ applicationForm, setApplicationForm
           title="Создание заявки"
           text="Заполните данные абитуриента и выберите специальность для подачи заявления."
         />
-        <Stack component="form" spacing={2} onSubmit={handleCreateApplication} sx={{ maxWidth: 760 }}>
+        <Stack component="form" spacing={2.5} onSubmit={handleCreateApplication} sx={{ maxWidth: 760 }}>
           <TextField
             select
             label="Специальность"
@@ -1473,6 +1504,52 @@ function ApplicantApplicationCreateSection({ applicationForm, setApplicationForm
               </MenuItem>
             ))}
           </TextField>
+          <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  Документы для заявки
+                </Typography>
+                <TextField
+                  select
+                  label="Тип документов"
+                  value={applicationCreateDocumentType}
+                  onChange={(event) => setApplicationCreateDocumentType(event.target.value)}
+                  fullWidth
+                >
+                  <MenuItem value="PASSPORT">Паспорт</MenuItem>
+                  <MenuItem value="EDUCATION_CERTIFICATE">Аттестат</MenuItem>
+                  <MenuItem value="PHOTO">Фотография</MenuItem>
+                  <MenuItem value="MEDICAL_CERTIFICATE">Медицинская справка</MenuItem>
+                  <MenuItem value="SNILS">СНИЛС</MenuItem>
+                  <MenuItem value="OTHER">Другой документ</MenuItem>
+                </TextField>
+                <Button component="label" variant="outlined" startIcon={<CloudUpload />} sx={{ alignSelf: 'flex-start' }}>
+                  Выбрать файлы
+                  <input
+                    type="file"
+                    hidden
+                    multiple
+                    onChange={(event) => setApplicationCreateDocuments(Array.from(event.target.files || []))}
+                  />
+                </Button>
+                <Typography variant="body2" color="text.secondary">
+                  {applicationCreateDocuments.length
+                    ? `Выбрано файлов: ${applicationCreateDocuments.length}`
+                    : 'Файлы можно прикрепить сразу при создании заявки.'}
+                </Typography>
+                {applicationCreateDocuments.length ? (
+                  <Stack spacing={0.5}>
+                    {applicationCreateDocuments.map((file) => (
+                      <Typography key={`${file.name}-${file.size}`} variant="body2">
+                        {file.name}
+                      </Typography>
+                    ))}
+                  </Stack>
+                ) : null}
+              </Stack>
+            </CardContent>
+          </Card>
           <TextField
             label="Серия паспорта"
             value={applicationForm.passportSeries}
@@ -1515,7 +1592,7 @@ function ApplicantApplicationCreateSection({ applicationForm, setApplicationForm
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Баллы"
+                label="Средний балл в аттестате"
                 type="number"
                 value={applicationForm.points}
                 onChange={(event) => setApplicationForm({ ...applicationForm, points: event.target.value })}
@@ -1727,7 +1804,7 @@ function StaffQueueSection({
                         <InfoTile label="Телефон" value={selectedStaffApplication.applicant.phone} />
                         <InfoTile label="Дата подачи" value={formatDate(selectedStaffApplication.createdAt)} />
                         <InfoTile label="Документов" value={selectedStaffApplication.documents?.length || 0} />
-                        <InfoTile label="Баллы" value={selectedStaffApplication.points} />
+                        <InfoTile label="Средний балл в аттестате" value={selectedStaffApplication.points} />
                       </Grid>
                     </Stack>
                   </CardContent>

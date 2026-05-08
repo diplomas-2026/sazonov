@@ -70,6 +70,7 @@ export const api = {
   publicDepartments: () => request('/public/departments'),
   publicSpecialities: () => request('/public/specialities'),
   publicDashboard: () => request('/public/dashboard'),
+  publicLeaderboard: () => request('/public/leaderboard'),
   applicantApplications: (token) => request('/applicant/applications', { token }),
   applicantCreateApplication: (token, payload) =>
     request('/applicant/applications', { token, method: 'POST', body: payload }),

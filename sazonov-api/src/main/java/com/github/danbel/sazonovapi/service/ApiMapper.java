@@ -7,7 +7,10 @@ import com.github.danbel.sazonovapi.domain.AppUser;
 import com.github.danbel.sazonovapi.domain.Speciality;
 import com.github.danbel.sazonovapi.dto.ApplicationDocumentResponse;
 import com.github.danbel.sazonovapi.dto.ApplicationResponse;
+import com.github.danbel.sazonovapi.dto.LeaderboardEntryResponse;
+import com.github.danbel.sazonovapi.dto.LeaderboardResponse;
 import com.github.danbel.sazonovapi.dto.DepartmentResponse;
+import com.github.danbel.sazonovapi.dto.SpecialityLeaderboardResponse;
 import com.github.danbel.sazonovapi.dto.SpecialityResponse;
 import com.github.danbel.sazonovapi.dto.SpecialityStatsResponse;
 import com.github.danbel.sazonovapi.dto.UserResponse;
@@ -102,5 +105,46 @@ public final class ApiMapper {
             speciality.getDepartment().getName(),
             applications
         );
+    }
+
+    public static LeaderboardEntryResponse leaderboardEntryResponse(
+        AdmissionApplication application,
+        int rank,
+        boolean budgetPlace
+    ) {
+        return new LeaderboardEntryResponse(
+            application.getId(),
+            application.getApplicant().getId(),
+            application.getApplicant().getFullName(),
+            application.getApplicant().getUsername(),
+            application.getPoints(),
+            rank,
+            budgetPlace,
+            application.getStatus(),
+            application.getGraduationSchool(),
+            application.getGraduationYear()
+        );
+    }
+
+    public static SpecialityLeaderboardResponse specialityLeaderboardResponse(
+        Speciality speciality,
+        long applications,
+        List<LeaderboardEntryResponse> entries
+    ) {
+        return new SpecialityLeaderboardResponse(
+            speciality.getId(),
+            speciality.getCode(),
+            speciality.getName(),
+            speciality.getDepartment().getId(),
+            speciality.getDepartment().getCode(),
+            speciality.getDepartment().getName(),
+            speciality.getBudgetPlaces(),
+            applications,
+            entries
+        );
+    }
+
+    public static LeaderboardResponse leaderboardResponse(List<SpecialityLeaderboardResponse> specialities) {
+        return new LeaderboardResponse(specialities);
     }
 }
