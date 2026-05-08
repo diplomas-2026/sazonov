@@ -34,7 +34,6 @@ import {
   DeleteOutline,
   Download,
   Edit,
-  Description,
   EmojiEvents,
   Login,
   Logout,
@@ -87,10 +86,7 @@ const REQUIRED_APPLICATION_DOCUMENTS = [
   { value: 'PHOTO', label: 'Фотография', hint: 'Фото абитуриента для личного дела.' },
 ];
 
-const STATUS_OPTIONS = [
-  { value: 'ALL', label: 'Все заявки' },
-  ...Object.keys(STATUS_LABELS).map((value) => ({ value, label: STATUS_LABELS[value] })),
-];
+const KANBAN_STATUSES = ['SUBMITTED', 'UNDER_REVIEW', 'MISSING_DOCS', 'ACCEPTED', 'REJECTED', 'CANCELLED'];
 
 const emptyLogin = {
   username: 'admin',
@@ -177,7 +173,6 @@ function App() {
   const [publicLeaderboard, setPublicLeaderboard] = useState([]);
   const [applicantApplications, setApplicantApplications] = useState([]);
   const [staffApplications, setStaffApplications] = useState([]);
-  const [staffFilter, setStaffFilter] = useState('ALL');
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminDepartments, setAdminDepartments] = useState([]);
   const [adminSpecialities, setAdminSpecialities] = useState([]);
@@ -229,7 +224,7 @@ function App() {
         }
 
         if (nextAuth.user.role === 'STAFF' || nextAuth.user.role === 'ADMIN') {
-          const applications = await api.staffApplications(nextAuth.token, staffFilter === 'ALL' ? undefined : staffFilter);
+          const applications = await api.staffApplications(nextAuth.token);
           setStaffApplications(applications);
           setSelectedStaffApplicationId((current) => current || `${applications[0]?.id || ''}`);
         }
@@ -253,7 +248,7 @@ function App() {
         setError(nextError.message);
       }
     },
-    [auth, loadPublic, staffFilter],
+    [auth, loadPublic],
   );
 
   useEffect(() => {
@@ -293,9 +288,9 @@ function App() {
         }
 
         if (me.user.role === 'STAFF' || me.user.role === 'ADMIN') {
-          const applications = await api.staffApplications(nextAuth.token);
-          setStaffApplications(applications);
-          setSelectedStaffApplicationId(`${applications[0]?.id || ''}`);
+        const applications = await api.staffApplications(nextAuth.token);
+        setStaffApplications(applications);
+        setSelectedStaffApplicationId(`${applications[0]?.id || ''}`);
         }
 
         if (me.user.role === 'ADMIN') {
@@ -752,19 +747,17 @@ function App() {
     }
   }
 
-  async function handleStaffStatusSave(event) {
-    event.preventDefault();
-    if (!auth || !selectedStaffApplication) return;
-    const form = new FormData(event.currentTarget);
+  async function updateApplicationStatus(applicationId, nextStatus, staffComment = '') {
+    if (!auth) return;
     setError('');
     setMessage('');
 
     try {
-      await api.staffUpdateStatus(auth.token, selectedStaffApplication.id, {
-        status: form.get('status'),
-        staffComment: form.get('staffComment'),
+      await api.staffUpdateStatus(auth.token, applicationId, {
+        status: nextStatus,
+        staffComment,
       });
-      const applications = await api.staffApplications(auth.token, staffFilter === 'ALL' ? undefined : staffFilter);
+      const applications = await api.staffApplications(auth.token);
       setStaffApplications(applications);
       setMessage('Статус заявки обновлён');
     } catch (nextError) {
@@ -772,16 +765,11 @@ function App() {
     }
   }
 
-  async function handleStaffFilterChange(nextFilter) {
-    if (!auth) return;
-    setStaffFilter(nextFilter);
-    try {
-      const applications = await api.staffApplications(auth.token, nextFilter === 'ALL' ? undefined : nextFilter);
-      setStaffApplications(applications);
-      setSelectedStaffApplicationId(`${applications[0]?.id || ''}`);
-    } catch (nextError) {
-      setError(nextError.message);
-    }
+  async function handleStaffStatusSave(event) {
+    event.preventDefault();
+    if (!auth || !selectedStaffApplication) return;
+    const form = new FormData(event.currentTarget);
+    await updateApplicationStatus(selectedStaffApplication.id, form.get('status'), form.get('staffComment'));
   }
 
   async function handleSpecialitySave(event) {
@@ -1330,14 +1318,12 @@ function App() {
               setApplicationEditForm,
               savingApplicationEdit,
               cancellingApplication,
+              updateApplicationStatus,
+              handleStaffStatusSave,
               documentTypes: DOCUMENT_TYPES,
-              staffFilter,
-              setStaffFilter: handleStaffFilterChange,
               applications: staffApplications,
               selectedStaffApplication,
               setSelectedStaffApplicationId,
-              handleStaffStatusSave,
-              statusOptions: STATUS_OPTIONS,
               adminDashboard,
               adminSpecialities,
               adminUsers,
@@ -1388,7 +1374,7 @@ function renderActiveSection(props) {
           case 'application-create':
             return <ApplicantApplicationCreateSection {...props} />;
           case 'application-details':
-            return <ApplicantApplicationDetailsSection {...props} />;
+            return <ApplicantApplicationDetailsSection {...props} viewerRole="APPLICANT" />;
           case 'leaderboard':
             return <LeaderboardSection {...props} />;
           case 'departments':
@@ -1421,6 +1407,21 @@ function renderActiveSection(props) {
                 setSelectedApplicantApplicationId={props.setSelectedApplicantApplicationId}
               />
             );
+          case 'application-details':
+            return (
+              <ApplicantApplicationDetailsSection
+                auth={props.auth}
+                selectedApplicantApplication={props.selectedStaffApplication}
+                selectedApplicantApplicationCanEdit={false}
+                setActiveSection={props.setActiveSection}
+                viewerRole={auth.user.role}
+                handleStaffStatusSave={props.handleStaffStatusSave}
+                handleDownloadDocument={props.handleDownloadDocument}
+                handleDeleteDocument={props.handleDeleteDocument}
+                handleUploadDocument={props.handleUploadDocument}
+                documentTypes={props.documentTypes}
+              />
+            );
           case 'leaderboard':
             return <LeaderboardSection {...props} />;
           case 'queue':
@@ -1433,6 +1434,21 @@ function renderActiveSection(props) {
             return <StaffQueueSection {...props} />;
           case 'departments':
             return <AdminDepartmentsSection {...props} />;
+          case 'application-details':
+            return (
+              <ApplicantApplicationDetailsSection
+                auth={props.auth}
+                selectedApplicantApplication={props.selectedStaffApplication}
+                selectedApplicantApplicationCanEdit={false}
+                setActiveSection={props.setActiveSection}
+                viewerRole={auth.user.role}
+                handleStaffStatusSave={props.handleStaffStatusSave}
+                handleDownloadDocument={props.handleDownloadDocument}
+                handleDeleteDocument={props.handleDeleteDocument}
+                handleUploadDocument={props.handleUploadDocument}
+                documentTypes={props.documentTypes}
+              />
+            );
           case 'leaderboard':
             return <LeaderboardSection {...props} />;
           case 'users':
@@ -1550,12 +1566,14 @@ function ApplicantApplicationDetailsSection({
   selectedApplicantApplication,
   selectedApplicantApplicationCanEdit,
   setActiveSection,
+  viewerRole,
   applicantUsedSpecialityIds,
   publicSpecialities,
   applicationEditForm,
   setApplicationEditForm,
   handleUpdateApplication,
   handleCancelApplication,
+  handleStaffStatusSave,
   handleDownloadDocument,
   handleDeleteDocument,
   handleUploadDocument,
@@ -1572,13 +1590,47 @@ function ApplicantApplicationDetailsSection({
               <Box>
                 <SectionHeader title="Подробности заявки" text="Полная информация по выбранной записи." />
               </Box>
-              <Button variant="outlined" onClick={() => setActiveSection('applications')}>
+              <Button
+                variant="outlined"
+                onClick={() => setActiveSection(viewerRole === 'STAFF' ? 'queue' : 'applications')}
+              >
                 К списку заявок
               </Button>
             </Stack>
 
             {selectedApplicantApplication ? (
               <Stack spacing={2.5}>
+                {viewerRole !== 'APPLICANT' ? (
+                  <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                    <CardContent>
+                      <SectionHeader
+                        title="Смена статуса"
+                        text="Перетаскивание карточек в канбане меняет статус, а здесь можно внести статус и комментарий вручную."
+                      />
+                      <Stack component="form" spacing={2} onSubmit={handleStaffStatusSave}>
+                        <TextField select name="status" label="Новый статус" defaultValue={selectedApplicantApplication.status} fullWidth>
+                          {KANBAN_STATUSES.map((status) => (
+                            <MenuItem key={status} value={status}>
+                              {STATUS_LABELS[status]}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                        <TextField
+                          name="staffComment"
+                          label="Комментарий"
+                          defaultValue={selectedApplicantApplication.staffComment || ''}
+                          multiline
+                          minRows={3}
+                          fullWidth
+                        />
+                        <Button type="submit" variant="contained" startIcon={<AssignmentTurnedIn />}>
+                          Сохранить статус
+                        </Button>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
                   <CardContent>
                     <Stack spacing={2}>
@@ -1645,153 +1697,155 @@ function ApplicantApplicationDetailsSection({
                   );
                 })()}
 
-                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                  <CardContent>
-                    <SectionHeader
-                      title="Редактирование заявки"
-                      text="Можно изменить данные заявки до её окончательного рассмотрения."
-                    />
+                {viewerRole === 'APPLICANT' ? (
+                  <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                    <CardContent>
+                      <SectionHeader
+                        title="Редактирование заявки"
+                        text="Можно изменить данные заявки до её окончательного рассмотрения."
+                      />
 
-                    {selectedApplicantApplicationCanEdit ? (
-                      <Stack component="form" spacing={2} onSubmit={handleUpdateApplication}>
-                        <TextField
-                          select
-                          label="Специальность"
-                          value={applicationEditForm.specialityId}
-                          onChange={(event) =>
-                            setApplicationEditForm({ ...applicationEditForm, specialityId: event.target.value })
-                          }
-                          fullWidth
-                        >
-                          <MenuItem value="">Выберите специальность</MenuItem>
-                          {publicSpecialities.map((speciality) => (
-                            <MenuItem
-                              key={speciality.id}
-                              value={speciality.id}
-                              disabled={
-                                `${speciality.id}` !== `${selectedApplicantApplication.speciality?.id || ''}` &&
-                                applicantUsedSpecialityIds.has(`${speciality.id}`)
-                              }
-                            >
-                              {speciality.department?.name || 'Без отделения'} · {speciality.code} · {speciality.name}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                        <Typography variant="body2" color="text.secondary">
-                          Нельзя выбрать специальность, на которую вы уже подавали заявку.
-                        </Typography>
-
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              label="Серия паспорта"
-                              value={applicationEditForm.passportSeries}
-                              onChange={(event) =>
-                                setApplicationEditForm({ ...applicationEditForm, passportSeries: event.target.value })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              label="Номер паспорта"
-                              value={applicationEditForm.passportNumber}
-                              onChange={(event) =>
-                                setApplicationEditForm({ ...applicationEditForm, passportNumber: event.target.value })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              label="СНИЛС"
-                              value={applicationEditForm.snils}
-                              onChange={(event) => setApplicationEditForm({ ...applicationEditForm, snils: event.target.value })}
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              label="Номер аттестата"
-                              value={applicationEditForm.educationDocumentNumber}
-                              onChange={(event) =>
-                                setApplicationEditForm({
-                                  ...applicationEditForm,
-                                  educationDocumentNumber: event.target.value,
-                                })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12}>
-                            <TextField
-                              label="Школа / колледж"
-                              value={applicationEditForm.graduationSchool}
-                              onChange={(event) =>
-                                setApplicationEditForm({ ...applicationEditForm, graduationSchool: event.target.value })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              label="Год окончания"
-                              type="number"
-                              value={applicationEditForm.graduationYear}
-                              onChange={(event) =>
-                                setApplicationEditForm({ ...applicationEditForm, graduationYear: event.target.value })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              label="Средний балл в аттестате"
-                              type="number"
-                              value={applicationEditForm.points}
-                              onChange={(event) =>
-                                setApplicationEditForm({ ...applicationEditForm, points: event.target.value })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12}>
-                            <TextField
-                              label="Комментарий"
-                              value={applicationEditForm.applicantComment}
-                              onChange={(event) =>
-                                setApplicationEditForm({ ...applicationEditForm, applicantComment: event.target.value })
-                              }
-                              multiline
-                              minRows={3}
-                              fullWidth
-                            />
-                          </Grid>
-                        </Grid>
-
-                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                          <Button type="submit" variant="contained" startIcon={<Edit />} disabled={savingApplicationEdit}>
-                            {savingApplicationEdit ? 'Сохранение...' : 'Сохранить изменения'}
-                          </Button>
-                          <Button
-                            type="button"
-                            color="error"
-                            variant="outlined"
-                            startIcon={<Block />}
-                            onClick={handleCancelApplication}
-                            disabled={cancellingApplication}
+                      {selectedApplicantApplicationCanEdit ? (
+                        <Stack component="form" spacing={2} onSubmit={handleUpdateApplication}>
+                          <TextField
+                            select
+                            label="Специальность"
+                            value={applicationEditForm.specialityId}
+                            onChange={(event) =>
+                              setApplicationEditForm({ ...applicationEditForm, specialityId: event.target.value })
+                            }
+                            fullWidth
                           >
-                            {cancellingApplication ? 'Отмена...' : 'Отменить заявку'}
-                          </Button>
+                            <MenuItem value="">Выберите специальность</MenuItem>
+                            {publicSpecialities.map((speciality) => (
+                              <MenuItem
+                                key={speciality.id}
+                                value={speciality.id}
+                                disabled={
+                                  `${speciality.id}` !== `${selectedApplicantApplication.speciality?.id || ''}` &&
+                                  applicantUsedSpecialityIds.has(`${speciality.id}`)
+                                }
+                              >
+                                {speciality.department?.name || 'Без отделения'} · {speciality.code} · {speciality.name}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                          <Typography variant="body2" color="text.secondary">
+                            Нельзя выбрать специальность, на которую вы уже подавали заявку.
+                          </Typography>
+
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Серия паспорта"
+                                value={applicationEditForm.passportSeries}
+                                onChange={(event) =>
+                                  setApplicationEditForm({ ...applicationEditForm, passportSeries: event.target.value })
+                                }
+                                fullWidth
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Номер паспорта"
+                                value={applicationEditForm.passportNumber}
+                                onChange={(event) =>
+                                  setApplicationEditForm({ ...applicationEditForm, passportNumber: event.target.value })
+                                }
+                                fullWidth
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="СНИЛС"
+                                value={applicationEditForm.snils}
+                                onChange={(event) => setApplicationEditForm({ ...applicationEditForm, snils: event.target.value })}
+                                fullWidth
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Номер аттестата"
+                                value={applicationEditForm.educationDocumentNumber}
+                                onChange={(event) =>
+                                  setApplicationEditForm({
+                                    ...applicationEditForm,
+                                    educationDocumentNumber: event.target.value,
+                                  })
+                                }
+                                fullWidth
+                              />
+                            </Grid>
+                            <Grid item xs={12}>
+                              <TextField
+                                label="Школа / колледж"
+                                value={applicationEditForm.graduationSchool}
+                                onChange={(event) =>
+                                  setApplicationEditForm({ ...applicationEditForm, graduationSchool: event.target.value })
+                                }
+                                fullWidth
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Год окончания"
+                                type="number"
+                                value={applicationEditForm.graduationYear}
+                                onChange={(event) =>
+                                  setApplicationEditForm({ ...applicationEditForm, graduationYear: event.target.value })
+                                }
+                                fullWidth
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Средний балл в аттестате"
+                                type="number"
+                                value={applicationEditForm.points}
+                                onChange={(event) =>
+                                  setApplicationEditForm({ ...applicationEditForm, points: event.target.value })
+                                }
+                                fullWidth
+                              />
+                            </Grid>
+                            <Grid item xs={12}>
+                              <TextField
+                                label="Комментарий"
+                                value={applicationEditForm.applicantComment}
+                                onChange={(event) =>
+                                  setApplicationEditForm({ ...applicationEditForm, applicantComment: event.target.value })
+                                }
+                                multiline
+                                minRows={3}
+                                fullWidth
+                              />
+                            </Grid>
+                          </Grid>
+
+                          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                            <Button type="submit" variant="contained" startIcon={<Edit />} disabled={savingApplicationEdit}>
+                              {savingApplicationEdit ? 'Сохранение...' : 'Сохранить изменения'}
+                            </Button>
+                            <Button
+                              type="button"
+                              color="error"
+                              variant="outlined"
+                              startIcon={<Block />}
+                              onClick={handleCancelApplication}
+                              disabled={cancellingApplication}
+                            >
+                              {cancellingApplication ? 'Отмена...' : 'Отменить заявку'}
+                            </Button>
+                          </Stack>
                         </Stack>
-                      </Stack>
-                    ) : (
-                      <Alert severity="info" variant="outlined">
-                        Эту заявку уже нельзя редактировать. Изменение данных доступно только до финального решения.
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
+                      ) : (
+                        <Alert severity="info" variant="outlined">
+                          Эту заявку уже нельзя редактировать. Изменение данных доступно только до финального решения.
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
                   <CardContent>
@@ -1801,8 +1855,9 @@ function ApplicantApplicationDetailsSection({
                         <DocumentRow
                           key={document.id}
                           document={document}
+                          compact={viewerRole !== 'APPLICANT'}
                           onDownload={() => handleDownloadDocument(document.id)}
-                          onDelete={() => handleDeleteDocument(document.id)}
+                          onDelete={viewerRole === 'APPLICANT' ? () => handleDeleteDocument(document.id) : undefined}
                         />
                       ))}
                       {!selectedApplicantApplication.documents?.length ? (
@@ -1812,38 +1867,40 @@ function ApplicantApplicationDetailsSection({
                   </CardContent>
                 </Card>
 
-                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                  <CardContent>
-                    <SectionHeader title="Загрузка документа" text="Добавьте файл к выбранной заявке." />
-                    <Box component="form" onSubmit={handleUploadDocument} sx={{ display: 'grid', gap: 2 }}>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                          <TextField select name="type" label="Тип документа" defaultValue={documentTypes[0].value} fullWidth>
-                            {documentTypes.map((item) => (
-                              <MenuItem key={item.value} value={item.value}>
-                                {item.label}
-                              </MenuItem>
-                            ))}
-                          </TextField>
+                {viewerRole === 'APPLICANT' ? (
+                  <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+                    <CardContent>
+                      <SectionHeader title="Загрузка документа" text="Добавьте файл к выбранной заявке." />
+                      <Box component="form" onSubmit={handleUploadDocument} sx={{ display: 'grid', gap: 2 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={6}>
+                            <TextField select name="type" label="Тип документа" defaultValue={documentTypes[0].value} fullWidth>
+                              {documentTypes.map((item) => (
+                                <MenuItem key={item.value} value={item.value}>
+                                  {item.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={12} md={6}>
+                            <Button
+                              component="label"
+                              variant="outlined"
+                              startIcon={<CloudUpload />}
+                              sx={{ height: '56px', width: '100%', justifyContent: 'flex-start' }}
+                            >
+                              Выбрать файл
+                              <input name="file" type="file" hidden />
+                            </Button>
+                          </Grid>
                         </Grid>
-                        <Grid item xs={12} md={6}>
-                          <Button
-                            component="label"
-                            variant="outlined"
-                            startIcon={<CloudUpload />}
-                            sx={{ height: '56px', width: '100%', justifyContent: 'flex-start' }}
-                          >
-                            Выбрать файл
-                            <input name="file" type="file" hidden />
-                          </Button>
-                        </Grid>
-                      </Grid>
-                      <Button type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>
-                        Загрузить
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
+                        <Button type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>
+                          Загрузить
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 <ApplicationChatSection
                   auth={auth}
@@ -2517,155 +2574,153 @@ function SpecialitiesDirectorySection({ departments, publicSpecialities }) {
 
 function StaffQueueSection({
   auth,
-  staffFilter,
-  setStaffFilter,
   applications,
   selectedStaffApplication,
   setSelectedStaffApplicationId,
-  handleStaffStatusSave,
-  statusOptions,
+  setActiveSection,
+  updateApplicationStatus,
 }) {
+  const [draggedApplicationId, setDraggedApplicationId] = useState('');
+  const groupedApplications = useMemo(() => {
+    return KANBAN_STATUSES.reduce((acc, status) => {
+      acc[status] = applications.filter((application) => application.status === status);
+      return acc;
+    }, {});
+  }, [applications]);
+
+  function handleDragStart(applicationId) {
+    setDraggedApplicationId(`${applicationId}`);
+  }
+
+  function handleDrop(nextStatus, application) {
+    if (!draggedApplicationId) {
+      return;
+    }
+    if (`${application.status}` === `${nextStatus}`) {
+      setDraggedApplicationId('');
+      return;
+    }
+
+    updateApplicationStatus(application.id, nextStatus, application.staffComment || '');
+    setDraggedApplicationId('');
+  }
+
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardContent sx={{ p: 3 }}>
-        <SectionHeader
-          title="Очередь заявок"
-          text="Сотрудник видит все обращения и меняет статусы после проверки пакета документов."
-        />
+        <Stack spacing={2.5}>
+          <SectionHeader
+            title="Канбан заявок"
+            text="Перетаскивайте карточки между колонками статусов. Клик по карточке открывает подробности заявки."
+          />
 
-        <Tabs
-          value={staffFilter}
-          onChange={(_, nextFilter) => setStaffFilter(nextFilter)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ mb: 3 }}
-        >
-          {statusOptions.map((option) => (
-            <Tab key={option.value} value={option.value} label={option.label} />
-          ))}
-        </Tabs>
-
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-              {applications.map((application) => (
-                <ListItemButton
-                  key={application.id}
-                  selected={selectedStaffApplication?.id === application.id}
-                  onClick={() => setSelectedStaffApplicationId(`${application.id}`)}
-                  sx={{ alignItems: 'flex-start', py: 1.5 }}
-                >
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          №{application.id}
-                        </Typography>
-                        <StatusChip status={application.status} />
-                      </Stack>
+          <Grid container spacing={2}>
+            {KANBAN_STATUSES.map((status) => (
+              <Grid item xs={12} sm={6} md={4} xl={2} key={status}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 2.5,
+                    height: '100%',
+                    bgcolor: alpha('#fff', 0.85),
+                    borderColor: 'divider',
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    const application = applications.find((item) => `${item.id}` === draggedApplicationId);
+                    if (application) {
+                      handleDrop(status, application);
                     }
-                    secondary={application.applicant.fullName}
-                  />
-                </ListItemButton>
-              ))}
-              {!applications.length ? (
-                <Box sx={{ p: 2 }}>
-                  <EmptyState title="Нет заявок" text="Сейчас в очереди нет заявок по выбранному фильтру." />
-                </Box>
-              ) : null}
-            </List>
-          </Grid>
-
-          <Grid item xs={12} md={8}>
-            {selectedStaffApplication ? (
-              <Stack spacing={2.5}>
-                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                  <CardContent>
-                    <Stack spacing={2}>
-                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
-                        <Box>
-                          <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700 }}>
-                            Заявка №{selectedStaffApplication.id}
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {selectedStaffApplication.applicant.fullName}
-                          </Typography>
-                        </Box>
-                        <StatusChip status={selectedStaffApplication.status} />
+                  }}
+                >
+                  <CardContent sx={{ p: 1.75 }}>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                          {STATUS_LABELS[status]}
+                        </Typography>
+                        <Chip label={groupedApplications[status]?.length || 0} size="small" />
                       </Stack>
 
-                      <Grid container spacing={2}>
-                        <InfoTile
-                          label="Специальность"
-                          value={`${selectedStaffApplication.speciality.code} · ${selectedStaffApplication.speciality.name}`}
-                        />
-                        <InfoTile label="Почта" value={selectedStaffApplication.applicant.email} />
-                        <InfoTile label="Телефон" value={selectedStaffApplication.applicant.phone} />
-                        <InfoTile label="Дата подачи" value={formatDate(selectedStaffApplication.createdAt)} />
-                        <InfoTile label="Документов" value={selectedStaffApplication.documents?.length || 0} />
-                        <InfoTile label="Средний балл в аттестате" value={selectedStaffApplication.points} />
-                      </Grid>
+                      <Stack spacing={1.25}>
+                        {groupedApplications[status]?.length ? (
+                          groupedApplications[status].map((application) => {
+                            const isSelected = selectedStaffApplication?.id === application.id;
+                            return (
+                              <Card
+                                key={application.id}
+                                variant="outlined"
+                                draggable
+                                onDragStart={() => handleDragStart(application.id)}
+                                onClick={() => {
+                                  setSelectedStaffApplicationId(`${application.id}`);
+                                  setActiveSection('application-details');
+                                }}
+                                sx={{
+                                  borderRadius: 2,
+                                  cursor: 'pointer',
+                                  borderColor: isSelected ? 'primary.main' : 'divider',
+                                  bgcolor: isSelected ? alpha('#1a73e8', 0.08) : 'background.paper',
+                                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                                  '&:hover': {
+                                    transform: 'translateY(-1px)',
+                                    boxShadow: '0 6px 18px rgba(60,64,67,0.10)',
+                                  },
+                                }}
+                              >
+                                <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                  <Stack spacing={1}>
+                                    <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                                      <Box>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                          №{application.id}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                          {application.applicant.fullName}
+                                        </Typography>
+                                      </Box>
+                                      <StatusChip status={application.status} />
+                                    </Stack>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.35 }}>
+                                      {application.speciality.code}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.35 }}>
+                                      {application.speciality.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {application.points} балл
+                                    </Typography>
+                                  </Stack>
+                                </CardContent>
+                              </Card>
+                            );
+                          })
+                        ) : (
+                          <Box
+                            sx={{
+                              border: '1px dashed',
+                              borderColor: 'divider',
+                              borderRadius: 2,
+                              p: 2,
+                              minHeight: 120,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'text.secondary',
+                              textAlign: 'center',
+                            }}
+                          >
+                            Нет заявок
+                          </Box>
+                        )}
+                      </Stack>
                     </Stack>
                   </CardContent>
                 </Card>
-
-                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                  <CardContent>
-                    <SectionHeader
-                      title="Смена статуса"
-                      text="Укажите итоговый статус и оставьте комментарий по проверке."
-                    />
-                    <Stack component="form" spacing={2} onSubmit={handleStaffStatusSave}>
-                      <TextField select name="status" label="Новый статус" defaultValue={selectedStaffApplication.status} fullWidth>
-                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                          <MenuItem key={value} value={value}>
-                            {label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                      <TextField
-                        name="staffComment"
-                        label="Комментарий"
-                        defaultValue={selectedStaffApplication.staffComment || ''}
-                        multiline
-                        minRows={3}
-                        fullWidth
-                      />
-                      <Button type="submit" variant="contained" startIcon={<AssignmentTurnedIn />}>
-                        Сохранить статус
-                      </Button>
-                    </Stack>
-                  </CardContent>
-                </Card>
-
-                <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                  <CardContent>
-                    <SectionHeader title="Документы" text="Набор файлов, прикрепленных к заявке." />
-                    <Stack spacing={1.5}>
-                      {selectedStaffApplication.documents?.map((document) => (
-                        <DocumentRow key={document.id} document={document} compact />
-                      ))}
-                    </Stack>
-                  </CardContent>
-                </Card>
-
-                <ApplicationChatSection
-                  auth={auth}
-                  applicationId={selectedStaffApplication.id}
-                  currentUsername={auth.user.username}
-                  title="Чат заявки"
-                  text="Пишите по заявке только текстом. Сообщения видят абитуриент этой заявки, сотрудники и администраторы."
-                />
-              </Stack>
-            ) : (
-              <Card variant="outlined" sx={{ borderRadius: 2.5, minHeight: 260 }}>
-                <CardContent sx={{ p: 3 }}>
-                  <EmptyState title="Выберите заявку" text="Откройте заявку слева, чтобы проверить документы и поменять статус." />
-                </CardContent>
-              </Card>
-            )}
+              </Grid>
+            ))}
           </Grid>
-        </Grid>
+        </Stack>
       </CardContent>
     </Card>
   );
