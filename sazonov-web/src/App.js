@@ -109,6 +109,19 @@ const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_UPLOAD_SIZE_LABEL = '5 МБ';
 const MAX_UPLOAD_FILES_PER_BATCH = 5;
 
+function createApplicationDocumentGroup(type = 'PASSPORT') {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type,
+    files: [],
+  };
+}
+
+function getNextApplicationDocumentType(groups) {
+  const usedTypes = new Set(groups.map((group) => group.type));
+  return DOCUMENT_TYPES.find((type) => !usedTypes.has(type.value))?.value || DOCUMENT_TYPES[0].value;
+}
+
 function normalizeAverageScoreInput(value) {
   return `${value ?? ''}`.trim().replace(',', '.');
 }
@@ -141,6 +154,10 @@ function isFileWithinLimit(file) {
 
 function getFileSizeLimitMessage(file) {
   return `Файл «${file.name}» превышает ${MAX_UPLOAD_SIZE_LABEL}. Выберите файл меньше или равный ${MAX_UPLOAD_SIZE_LABEL}.`;
+}
+
+function getFileCountLimitMessage() {
+  return `Можно загрузить не больше ${MAX_UPLOAD_FILES_PER_BATCH} файлов за раз`;
 }
 
 function getApplicationSearchText(application) {
@@ -279,8 +296,9 @@ function App() {
   const [applicationEditForm, setApplicationEditForm] = useState(emptyApplicationEdit);
   const [applicationFormErrors, setApplicationFormErrors] = useState(emptyApplicationErrors);
   const [applicationEditErrors, setApplicationEditErrors] = useState(emptyApplicationErrors);
-  const [applicationCreateDocuments, setApplicationCreateDocuments] = useState([]);
-  const [applicationCreateDocumentType, setApplicationCreateDocumentType] = useState('PASSPORT');
+  const [applicationCreateDocumentGroups, setApplicationCreateDocumentGroups] = useState([
+    createApplicationDocumentGroup('PASSPORT'),
+  ]);
   const [departmentForm, setDepartmentForm] = useState(emptyDepartment);
   const [specialityForm, setSpecialityForm] = useState(emptySpeciality);
   const [userForm, setUserForm] = useState(emptyUser);
@@ -688,8 +706,7 @@ function App() {
     setAdminDashboard(null);
     setPublicDepartments([]);
     setPublicLeaderboard([]);
-    setApplicationCreateDocuments([]);
-    setApplicationCreateDocumentType('PASSPORT');
+    setApplicationCreateDocumentGroups([createApplicationDocumentGroup('PASSPORT')]);
     setApplicationForm(emptyApplication);
     setApplicationEditForm(emptyApplicationEdit);
     setApplicationFormErrors(emptyApplicationErrors);
@@ -832,9 +849,17 @@ function App() {
       return;
     }
 
-    const oversizedFile = applicationCreateDocuments.find((file) => !isFileWithinLimit(file));
+    const selectedDocumentGroups = applicationCreateDocumentGroups.filter((group) => group.files.length);
+    const oversizedGroup = selectedDocumentGroups.find((group) => group.files.some((file) => !isFileWithinLimit(file)));
+    const tooManyFilesGroup = selectedDocumentGroups.find((group) => group.files.length > MAX_UPLOAD_FILES_PER_BATCH);
+    const allFiles = selectedDocumentGroups.flatMap((group) => group.files);
+    const oversizedFile = oversizedGroup?.files.find((file) => !isFileWithinLimit(file));
     if (oversizedFile) {
       setError(getFileSizeLimitMessage(oversizedFile));
+      return;
+    }
+    if (tooManyFilesGroup) {
+      setError(getFileCountLimitMessage());
       return;
     }
 
@@ -846,21 +871,22 @@ function App() {
         points: Number(parseAverageScoreInput(applicationForm.points).toFixed(2)),
       });
 
-      for (const file of applicationCreateDocuments) {
-        if (!isFileWithinLimit(file)) {
-          throw new Error(getFileSizeLimitMessage(file));
+      for (const group of selectedDocumentGroups) {
+        for (const file of group.files) {
+          if (!isFileWithinLimit(file)) {
+            throw new Error(getFileSizeLimitMessage(file));
+          }
+          await api.uploadDocument(auth.token, created.id, group.type, file);
         }
-        await api.uploadDocument(auth.token, created.id, applicationCreateDocumentType, file);
       }
 
-      setMessage(`Заявка №${created.id} создана`);
+      setMessage(allFiles.length ? `Заявка №${created.id} создана, файлов загружено: ${allFiles.length}` : `Заявка №${created.id} создана`);
       setApplicationForm({
         ...emptyApplication,
         specialityId: applicationForm.specialityId || `${publicSpecialities[0]?.id || ''}`,
       });
       setApplicationFormErrors(emptyApplicationErrors);
-      setApplicationCreateDocuments([]);
-      setApplicationCreateDocumentType('PASSPORT');
+      setApplicationCreateDocumentGroups([createApplicationDocumentGroup('PASSPORT')]);
       const applications = await api.applicantApplications(auth.token);
       setApplicantApplications(applications);
       setSelectedApplicantApplicationId(`${created.id}`);
@@ -1451,10 +1477,8 @@ function App() {
               setApplicationForm,
               applicationFormErrors,
               setError,
-              applicationCreateDocuments,
-              setApplicationCreateDocuments,
-              applicationCreateDocumentType,
-              setApplicationCreateDocumentType,
+              applicationCreateDocumentGroups,
+              setApplicationCreateDocumentGroups,
               publicDepartments,
               publicSpecialities,
               applicantUsedSpecialityIds,
@@ -2299,7 +2323,6 @@ function ApplicantApplicationDetailsSection({
                                 type="file"
                                 hidden
                                 multiple
-                                accept="image/*,.pdf,.doc,.docx,.jpg,.jpeg,.png"
                               />
                             </Button>
                           </Grid>
@@ -2338,10 +2361,8 @@ function ApplicantApplicationCreateSection({
   setApplicationForm,
   applicationFormErrors,
   setError,
-  applicationCreateDocuments,
-  setApplicationCreateDocuments,
-  applicationCreateDocumentType,
-  setApplicationCreateDocumentType,
+  applicationCreateDocumentGroups,
+  setApplicationCreateDocumentGroups,
   availableSpecialitiesForCreate,
   handleCreateApplication,
 }) {
@@ -2357,10 +2378,10 @@ function ApplicantApplicationCreateSection({
             select
             label="Специальность"
             value={applicationForm.specialityId}
-                          onChange={(event) => setApplicationForm({ ...applicationForm, specialityId: event.target.value })}
-                          fullWidth
-                        >
-                          <MenuItem value="">Выберите специальность</MenuItem>
+            onChange={(event) => setApplicationForm({ ...applicationForm, specialityId: event.target.value })}
+            fullWidth
+          >
+            <MenuItem value="">Выберите специальность</MenuItem>
             {availableSpecialitiesForCreate.map((speciality) => (
               <MenuItem key={speciality.id} value={speciality.id}>
                 {speciality.department?.name || 'Без отделения'} · {speciality.code} · {speciality.name}
@@ -2377,57 +2398,133 @@ function ApplicantApplicationCreateSection({
           ) : null}
           <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Stack spacing={2}>
+              <Stack spacing={2.5}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                   Документы для заявки
                 </Typography>
-                <TextField
-                  select
-                  label="Тип документов"
-                  value={applicationCreateDocumentType}
-                  onChange={(event) => setApplicationCreateDocumentType(event.target.value)}
-                  fullWidth
+
+                <Stack spacing={1.5}>
+                  {applicationCreateDocumentGroups.map((group, index) => (
+                    <Card key={group.id} variant="outlined" sx={{ borderRadius: 2, bgcolor: alpha('#fff', 0.7) }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Stack spacing={1.5}>
+                          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                              Тип документа #{index + 1}
+                            </Typography>
+                            {applicationCreateDocumentGroups.length > 1 ? (
+                              <Button
+                                size="small"
+                                color="error"
+                                variant="text"
+                                startIcon={<DeleteOutline />}
+                                onClick={() => {
+                                  setError('');
+                                  setApplicationCreateDocumentGroups((current) =>
+                                    current.filter((item) => item.id !== group.id),
+                                  );
+                                }}
+                              >
+                                Удалить тип
+                              </Button>
+                            ) : null}
+                          </Stack>
+
+                          <TextField
+                            select
+                            label="Тип документа"
+                            value={group.type}
+                            onChange={(event) => {
+                              setError('');
+                              setApplicationCreateDocumentGroups((current) =>
+                                current.map((item) => (item.id === group.id ? { ...item, type: event.target.value } : item)),
+                              );
+                            }}
+                            fullWidth
+                          >
+                            {DOCUMENT_TYPES.map((item) => (
+                              <MenuItem
+                                key={item.value}
+                                value={item.value}
+                                disabled={
+                                  applicationCreateDocumentGroups.some(
+                                    (itemGroup) => itemGroup.id !== group.id && itemGroup.type === item.value,
+                                  )
+                                }
+                              >
+                                {item.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+
+                          <Button component="label" variant="outlined" startIcon={<CloudUpload />} sx={{ alignSelf: 'flex-start' }}>
+                            Выбрать файлы
+                            <input
+                              type="file"
+                              hidden
+                              multiple
+                              onChange={(event) => {
+                                const nextFiles = Array.from(event.target.files || []);
+                                if (!nextFiles.length) {
+                                  return;
+                                }
+                                if (nextFiles.length > MAX_UPLOAD_FILES_PER_BATCH) {
+                                  setError(getFileCountLimitMessage());
+                                  return;
+                                }
+                                const tooLargeFile = nextFiles.find((file) => !isFileWithinLimit(file));
+                                if (tooLargeFile) {
+                                  setError(getFileSizeLimitMessage(tooLargeFile));
+                                  return;
+                                }
+                                setError('');
+                                setApplicationCreateDocumentGroups((current) =>
+                                  current.map((item) => (item.id === group.id ? { ...item, files: nextFiles } : item)),
+                                );
+                              }}
+                            />
+                          </Button>
+
+                          <Typography variant="body2" color="text.secondary">
+                            {group.files.length
+                              ? `Выбрано файлов: ${group.files.length}`
+                              : `Можно выбрать до ${MAX_UPLOAD_FILES_PER_BATCH} файлов для одного типа. Каждый файл до ${MAX_UPLOAD_SIZE_LABEL}.`}
+                          </Typography>
+
+                          {group.files.length ? (
+                            <Stack spacing={0.5}>
+                              {group.files.map((file) => (
+                                <Typography key={`${group.id}-${file.name}-${file.size}`} variant="body2">
+                                  {file.name}
+                                </Typography>
+                              ))}
+                            </Stack>
+                          ) : null}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+
+                <Button
+                  type="button"
+                  variant="outlined"
+                  startIcon={<Add />}
+                  sx={{ alignSelf: 'flex-start' }}
+                  onClick={() => {
+                    setError('');
+                    setApplicationCreateDocumentGroups((current) => [
+                      ...current,
+                      createApplicationDocumentGroup(getNextApplicationDocumentType(current)),
+                    ]);
+                  }}
                 >
-                  <MenuItem value="PASSPORT">Паспорт</MenuItem>
-                  <MenuItem value="EDUCATION_CERTIFICATE">Аттестат</MenuItem>
-                  <MenuItem value="PHOTO">Фотография</MenuItem>
-                  <MenuItem value="MEDICAL_CERTIFICATE">Медицинская справка</MenuItem>
-                  <MenuItem value="SNILS">СНИЛС</MenuItem>
-                  <MenuItem value="OTHER">Другой документ</MenuItem>
-                </TextField>
-                <Button component="label" variant="outlined" startIcon={<CloudUpload />} sx={{ alignSelf: 'flex-start' }}>
-                  Выбрать файлы
-                  <input
-                    type="file"
-                    hidden
-                    multiple
-                    accept="image/*,.pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(event) => {
-                      const nextFiles = Array.from(event.target.files || []);
-                      const tooLargeFile = nextFiles.find((file) => !isFileWithinLimit(file));
-                      if (tooLargeFile) {
-                        setError(getFileSizeLimitMessage(tooLargeFile));
-                      } else {
-                        setError('');
-                      }
-                      setApplicationCreateDocuments(nextFiles.filter(isFileWithinLimit));
-                    }}
-                  />
+                  Добавить тип документа
                 </Button>
+
                 <Typography variant="body2" color="text.secondary">
-                  {applicationCreateDocuments.length
-                    ? `Выбрано файлов: ${applicationCreateDocuments.length}`
-                    : `Файлы можно прикрепить сразу при создании заявки. Максимум ${MAX_UPLOAD_SIZE_LABEL} на файл.`}
+                  В каждом типе можно выбрать до {MAX_UPLOAD_FILES_PER_BATCH} файлов, каждый до {MAX_UPLOAD_SIZE_LABEL}.
                 </Typography>
-                {applicationCreateDocuments.length ? (
-                  <Stack spacing={0.5}>
-                    {applicationCreateDocuments.map((file) => (
-                      <Typography key={`${file.name}-${file.size}`} variant="body2">
-                        {file.name}
-                      </Typography>
-                    ))}
-                  </Stack>
-                ) : null}
               </Stack>
             </CardContent>
           </Card>
@@ -2472,17 +2569,17 @@ function ApplicantApplicationCreateSection({
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Средний балл в аттестате"
-                  type="text"
-                  inputMode="decimal"
-                  value={applicationForm.points}
-                  onChange={(event) => setApplicationForm({ ...applicationForm, points: event.target.value })}
-                  error={Boolean(applicationFormErrors.points)}
-                  helperText={applicationFormErrors.points || 'Допустимо значение от 2.00 до 5.00'}
-                  inputProps={{ min: AVERAGE_SCORE_MIN, max: AVERAGE_SCORE_MAX, step: '0.01' }}
-                  fullWidth
-                />
+              <TextField
+                label="Средний балл в аттестате"
+                type="text"
+                inputMode="decimal"
+                value={applicationForm.points}
+                onChange={(event) => setApplicationForm({ ...applicationForm, points: event.target.value })}
+                error={Boolean(applicationFormErrors.points)}
+                helperText={applicationFormErrors.points || 'Допустимо значение от 2.00 до 5.00'}
+                inputProps={{ min: AVERAGE_SCORE_MIN, max: AVERAGE_SCORE_MAX, step: '0.01' }}
+                fullWidth
+              />
             </Grid>
           </Grid>
           <TextField
