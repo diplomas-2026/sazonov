@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   AppBar,
@@ -419,6 +419,7 @@ function App() {
       case 'ADMIN':
         return [
           { value: 'dashboard', label: 'Сводка', icon: <Dashboard fontSize="small" /> },
+          { value: 'applications', label: 'Заявки', icon: <Assignment fontSize="small" /> },
           { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
           { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
@@ -1267,6 +1268,8 @@ function renderActiveSection(props) {
       }
     case 'ADMIN':
       switch (activeSection) {
+        case 'applications':
+          return <StaffQueueSection {...props} />;
         case 'departments':
           return <AdminDepartmentsSection {...props} />;
         case 'specialities':
@@ -1384,6 +1387,7 @@ function ApplicantApplicationsSection({
 }
 
 function ApplicantApplicationDetailsSection({
+  auth,
   selectedApplicantApplication,
   setActiveSection,
   handleDownloadDocument,
@@ -1485,6 +1489,14 @@ function ApplicantApplicationDetailsSection({
                     </Box>
                   </CardContent>
                 </Card>
+
+                <ApplicationChatSection
+                  auth={auth}
+                  applicationId={selectedApplicantApplication.id}
+                  currentUsername={auth.user.username}
+                  title="Чат заявки"
+                  text="В этом чате могут писать абитуриент этой заявки, сотрудники и администраторы."
+                />
               </Stack>
             ) : (
               <EmptyState title="Нет выбранной заявки" text="Откройте заявку из списка, чтобы посмотреть подробности." />
@@ -1797,6 +1809,176 @@ function LeaderboardSection({
   );
 }
 
+function ApplicationChatSection({ auth, applicationId, currentUsername, title, text }) {
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [lastMessageAt, setLastMessageAt] = useState(null);
+  const [chatError, setChatError] = useState('');
+  const messagesEndRef = useRef(null);
+
+  const loadMessages = useCallback(async () => {
+    if (!auth || !applicationId) return;
+    setLoading(true);
+    try {
+      const nextMessages = await api.applicationChatMessages(auth.token, applicationId);
+      setMessages(nextMessages);
+      setLastMessageAt(nextMessages.length ? nextMessages[nextMessages.length - 1].createdAt : null);
+      setChatError('');
+    } catch (nextError) {
+      setChatError(nextError.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [auth, applicationId]);
+
+  const checkLastMessage = useCallback(async () => {
+    if (!auth || !applicationId) return;
+    try {
+      const snapshot = await api.applicationChatLastMessage(auth.token, applicationId);
+      const nextLast = snapshot.lastMessageAt || null;
+      if (`${nextLast || ''}` !== `${lastMessageAt || ''}`) {
+        await loadMessages();
+      }
+    } catch (nextError) {
+      setChatError(nextError.message);
+    }
+  }, [auth, applicationId, lastMessageAt, loadMessages]);
+
+  useEffect(() => {
+    setDraft('');
+    setChatError('');
+    loadMessages();
+  }, [loadMessages]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      checkLastMessage();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [checkLastMessage]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages]);
+
+  async function handleSendMessage(event) {
+    event.preventDefault();
+    const content = draft.trim();
+    if (!content) {
+      return;
+    }
+
+    setSending(true);
+    setChatError('');
+    try {
+      await api.applicationSendChatMessage(auth.token, applicationId, content);
+      setDraft('');
+      await loadMessages();
+    } catch (nextError) {
+      setChatError(nextError.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2}>
+          <SectionHeader title={title} text={text} />
+
+          <Box
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              bgcolor: 'background.paper',
+              maxHeight: 420,
+              overflowY: 'auto',
+              p: 2,
+            }}
+          >
+            {loading && !messages.length ? (
+              <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 160 }}>
+                <CircularProgress size={28} />
+              </Stack>
+            ) : messages.length ? (
+              <Stack spacing={1.5}>
+                {messages.map((message) => {
+                  const isOwn = message.sender.username === currentUsername;
+                  return (
+                    <Box key={message.id} sx={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start' }}>
+                      <Card
+                        variant="outlined"
+                        sx={{
+                          maxWidth: '82%',
+                          width: 'fit-content',
+                          borderRadius: 3,
+                          borderColor: isOwn ? 'success.main' : 'divider',
+                          bgcolor: isOwn ? alpha('#2e7d32', 0.06) : alpha('#fff', 0.95),
+                        }}
+                      >
+                        <CardContent sx={{ py: 1.5, px: 2 }}>
+                          <Stack spacing={0.75}>
+                            <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                {message.sender.fullName}
+                              </Typography>
+                              <Chip
+                                label={ROLE_LABELS[message.sender.role]}
+                                size="small"
+                                variant="outlined"
+                                color={isOwn ? 'success' : 'default'}
+                              />
+                            </Stack>
+                            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                              {message.content}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatDate(message.createdAt)}
+                            </Typography>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Box>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </Stack>
+            ) : (
+              <EmptyState title="Чат пуст" text="Напишите первое сообщение по этой заявке." />
+            )}
+          </Box>
+
+          {chatError ? <Alert severity="error" variant="outlined">{chatError}</Alert> : null}
+
+          <Stack component="form" spacing={2} onSubmit={handleSendMessage}>
+            <TextField
+              label="Сообщение"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              multiline
+              minRows={3}
+              fullWidth
+              placeholder="Напишите текстовое сообщение..."
+            />
+            <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center" flexWrap="wrap">
+              <Typography variant="body2" color="text.secondary">
+                Обновление чата происходит автоматически каждые 5 секунд.
+              </Typography>
+              <Button type="submit" variant="contained" disabled={sending || !draft.trim()}>
+                {sending ? 'Отправка...' : 'Отправить'}
+              </Button>
+            </Stack>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 function DepartmentDirectorySection({ departments, specialities }) {
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
@@ -1867,6 +2049,7 @@ function SpecialitiesDirectorySection({ departments, publicSpecialities }) {
 }
 
 function StaffQueueSection({
+  auth,
   staffFilter,
   setStaffFilter,
   applications,
@@ -1998,6 +2181,14 @@ function StaffQueueSection({
                     </Stack>
                   </CardContent>
                 </Card>
+
+                <ApplicationChatSection
+                  auth={auth}
+                  applicationId={selectedStaffApplication.id}
+                  currentUsername={auth.user.username}
+                  title="Чат заявки"
+                  text="Пишите по заявке только текстом. Сообщения видят абитуриент этой заявки, сотрудники и администраторы."
+                />
               </Stack>
             ) : (
               <Card variant="outlined" sx={{ borderRadius: 2.5, minHeight: 260 }}>

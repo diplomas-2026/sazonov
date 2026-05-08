@@ -75,6 +75,11 @@ export const api = {
   applicantCreateApplication: (token, payload) =>
     request('/applicant/applications', { token, method: 'POST', body: payload }),
   applicantApplication: (token, id) => request(`/applicant/applications/${id}`, { token }),
+  applicationChatMessages: (token, applicationId) => request(`/chat/applications/${applicationId}/messages`, { token }),
+  applicationChatLastMessage: (token, applicationId) =>
+    request(`/chat/applications/${applicationId}/messages/last`, { token }),
+  applicationSendChatMessage: (token, applicationId, content) =>
+    request(`/chat/applications/${applicationId}/messages`, { token, method: 'POST', body: { content } }),
   uploadDocument: (token, applicationId, type, file) => {
     const formData = new FormData();
     formData.append('file', file);

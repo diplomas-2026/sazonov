@@ -1,12 +1,14 @@
 package com.github.danbel.sazonovapi.service;
 
 import com.github.danbel.sazonovapi.domain.AdmissionApplication;
+import com.github.danbel.sazonovapi.domain.ApplicationChatMessage;
 import com.github.danbel.sazonovapi.domain.ApplicationDocument;
 import com.github.danbel.sazonovapi.domain.Department;
 import com.github.danbel.sazonovapi.domain.AppUser;
 import com.github.danbel.sazonovapi.domain.Speciality;
 import com.github.danbel.sazonovapi.dto.ApplicationDocumentResponse;
 import com.github.danbel.sazonovapi.dto.ApplicationResponse;
+import com.github.danbel.sazonovapi.dto.ChatMessageResponse;
 import com.github.danbel.sazonovapi.dto.LeaderboardEntryResponse;
 import com.github.danbel.sazonovapi.dto.LeaderboardResponse;
 import com.github.danbel.sazonovapi.dto.DepartmentResponse;
@@ -92,6 +94,15 @@ public final class ApiMapper {
             application.getCreatedAt(),
             application.getUpdatedAt(),
             documents
+        );
+    }
+
+    public static ChatMessageResponse chatMessageResponse(ApplicationChatMessage message) {
+        return new ChatMessageResponse(
+            message.getId(),
+            userResponse(message.getSender()),
+            message.getContent(),
+            message.getCreatedAt()
         );
     }
 

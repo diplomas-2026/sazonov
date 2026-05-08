@@ -76,6 +76,9 @@ public class AdmissionApplication {
     @OneToMany(mappedBy = "application", orphanRemoval = true)
     private List<ApplicationDocument> documents = new ArrayList<>();
 
+    @OneToMany(mappedBy = "application", orphanRemoval = true)
+    private List<ApplicationChatMessage> chatMessages = new ArrayList<>();
+
     public void touch() {
         this.updatedAt = Instant.now();
     }
