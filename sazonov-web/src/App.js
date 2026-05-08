@@ -358,6 +358,16 @@ function App() {
     }
   }, [applicationForm.specialityId, publicSpecialities]);
 
+  useEffect(() => {
+    if (publicLeaderboard.length > 0) {
+      if (!selectedLeaderboardSpecialityId || !publicLeaderboard.some((item) => `${item.specialityId}` === `${selectedLeaderboardSpecialityId}`)) {
+        setSelectedLeaderboardSpecialityId(`${publicLeaderboard[0].specialityId}`);
+      }
+    } else {
+      setSelectedLeaderboardSpecialityId('');
+    }
+  }, [publicLeaderboard, selectedLeaderboardSpecialityId]);
+
   const selectedApplicantApplication = useMemo(
     () => applicantApplications.find((item) => `${item.id}` === `${selectedApplicantApplicationId}`) || null,
     [applicantApplications, selectedApplicantApplicationId],
@@ -395,18 +405,21 @@ function App() {
           { value: 'applications', label: 'Заявки', icon: <Assignment fontSize="small" /> },
           { value: 'application-create', label: 'Создание заявки', icon: <CloudUpload fontSize="small" /> },
           { value: 'documents', label: 'Документы', icon: <Description fontSize="small" /> },
+          { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
           { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
         ];
       case 'STAFF':
         return [
           { value: 'queue', label: 'Очередь', icon: <AssignmentTurnedIn fontSize="small" /> },
+          { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
           { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
         ];
       case 'ADMIN':
         return [
           { value: 'dashboard', label: 'Сводка', icon: <Dashboard fontSize="small" /> },
+          { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
           { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
           { value: 'users', label: 'Пользователи', icon: <AdminPanelSettings fontSize="small" /> },
@@ -479,10 +492,12 @@ function App() {
     setAdminSpecialities([]);
     setAdminDashboard(null);
     setPublicDepartments([]);
+    setPublicLeaderboard([]);
     setApplicationCreateDocuments([]);
     setApplicationCreateDocumentType('PASSPORT');
     setSelectedApplicantApplicationId('');
     setSelectedStaffApplicationId('');
+    setSelectedLeaderboardSpecialityId('');
     setSelectedSpecialityId('');
     setSelectedUserId('');
     setSelectedDepartmentId('');
@@ -1156,9 +1171,12 @@ function App() {
               setApplicationCreateDocumentType,
               publicDepartments,
               publicSpecialities,
+              publicLeaderboard,
               applicantApplications,
               selectedApplicantApplication,
               setSelectedApplicantApplicationId,
+              selectedLeaderboardSpecialityId,
+              setSelectedLeaderboardSpecialityId,
               setActiveSection,
               handleCreateApplication,
               handleUploadDocument,
@@ -1225,6 +1243,8 @@ function renderActiveSection(props) {
           return <ApplicantApplicationDetailsSection {...props} />;
         case 'documents':
           return <ApplicantDocumentsSection {...props} />;
+        case 'leaderboard':
+          return <LeaderboardSection {...props} />;
         case 'departments':
           return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
         case 'specialities':
@@ -1239,6 +1259,8 @@ function renderActiveSection(props) {
           return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
         case 'specialities':
           return <SpecialitiesDirectorySection departments={props.publicDepartments} publicSpecialities={props.publicSpecialities} />;
+        case 'leaderboard':
+          return <LeaderboardSection {...props} />;
         case 'queue':
         default:
           return <StaffQueueSection {...props} />;
@@ -1249,6 +1271,8 @@ function renderActiveSection(props) {
           return <AdminDepartmentsSection {...props} />;
         case 'specialities':
           return <AdminSpecialitiesSection {...props} />;
+        case 'leaderboard':
+          return <LeaderboardSection {...props} />;
         case 'users':
           return <AdminUsersSection {...props} />;
         case 'dashboard':
@@ -1643,6 +1667,131 @@ function ApplicantDocumentsSection({ selectedApplicantApplication, handleDownloa
         ) : (
           <EmptyState title="Нет выбранной заявки" text="Сначала создайте заявку, чтобы прикреплять документы." />
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LeaderboardSection({
+  publicLeaderboard,
+  selectedLeaderboardSpecialityId,
+  setSelectedLeaderboardSpecialityId,
+}) {
+  const selectedLeaderboard = useMemo(
+    () => publicLeaderboard.find((item) => `${item.specialityId}` === `${selectedLeaderboardSpecialityId}`) || null,
+    [publicLeaderboard, selectedLeaderboardSpecialityId],
+  );
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
+          <SectionHeader
+            title="Конкурсный список"
+            text="Списки отсортированы по среднему баллу в аттестате. Бюджетные места подсвечены зелёной рамкой."
+          />
+
+          {publicLeaderboard.length ? (
+            <>
+              <Tabs
+                value={selectedLeaderboardSpecialityId}
+                onChange={(_, nextValue) => setSelectedLeaderboardSpecialityId(nextValue)}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+              >
+                {publicLeaderboard.map((item) => (
+                  <Tab
+                    key={item.specialityId}
+                    value={`${item.specialityId}`}
+                    label={`${item.specialityCode} · ${item.specialityName}`}
+                  />
+                ))}
+              </Tabs>
+
+              {selectedLeaderboard ? (
+                <Stack spacing={2}>
+                  <Card variant="outlined" sx={{ borderRadius: 2.5, bgcolor: alpha('#fff', 0.9) }}>
+                    <CardContent sx={{ p: 2.5 }}>
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                          <Chip label={selectedLeaderboard.departmentName} size="small" />
+                          <Chip label={selectedLeaderboard.specialityCode} size="small" variant="outlined" />
+                          <Chip label={`Бюджетных мест: ${selectedLeaderboard.budgetPlaces || 0}`} size="small" color="success" variant="outlined" />
+                          <Chip label={`Заявок: ${selectedLeaderboard.applications || 0}`} size="small" variant="outlined" />
+                        </Stack>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          {selectedLeaderboard.specialityName}
+                        </Typography>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+
+                  <Stack spacing={1.5}>
+                    {selectedLeaderboard.entries?.map((entry) => (
+                      <Card
+                        key={entry.applicationId}
+                        variant="outlined"
+                        sx={{
+                          borderRadius: 2.5,
+                          borderWidth: 2,
+                          borderColor: entry.budgetPlace ? 'success.main' : 'divider',
+                          bgcolor: entry.budgetPlace ? alpha('#2e7d32', 0.04) : 'background.paper',
+                        }}
+                      >
+                        <CardContent sx={{ py: 2, px: 2.5 }}>
+                          <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={2} md={1}>
+                              <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1 }}>
+                                #{entry.rank}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={10} md={7}>
+                              <Stack spacing={0.5}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                  {entry.fullName}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {entry.username} · {entry.graduationSchool} · {entry.graduationYear}
+                                </Typography>
+                              </Stack>
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={2}>
+                              <Stack alignItems={{ xs: 'flex-start', md: 'center' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  Средний балл
+                                </Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                                  {entry.points}
+                                </Typography>
+                              </Stack>
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={2}>
+                              <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
+                                <Chip
+                                  label={entry.budgetPlace ? 'Проходит на бюджет' : 'Коммерция / конкурс'}
+                                  color={entry.budgetPlace ? 'success' : 'default'}
+                                  variant={entry.budgetPlace ? 'filled' : 'outlined'}
+                                />
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75 }}>
+                                  {entry.status}
+                                </Typography>
+                              </Stack>
+                            </Grid>
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Stack>
+                </Stack>
+              ) : (
+                <EmptyState title="Нет данных" text="Для выбранной специальности пока нет заявок." />
+              )}
+            </>
+          ) : (
+            <EmptyState title="Нет конкурсного списка" text="Сейчас нет данных для построения рейтинга." />
+          )}
+        </Stack>
       </CardContent>
     </Card>
   );
