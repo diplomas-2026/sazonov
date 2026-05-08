@@ -384,6 +384,7 @@ function App() {
         return [
           { value: 'profile', label: 'Профиль', icon: <Person fontSize="small" /> },
           { value: 'applications', label: 'Заявки', icon: <Assignment fontSize="small" /> },
+          { value: 'application-create', label: 'Создание заявки', icon: <CloudUpload fontSize="small" /> },
           { value: 'documents', label: 'Документы', icon: <Description fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
           { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
@@ -516,6 +517,7 @@ function App() {
       const applications = await api.applicantApplications(auth.token);
       setApplicantApplications(applications);
       setSelectedApplicantApplicationId(`${created.id}`);
+      setActiveSection('applications');
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -1168,6 +1170,7 @@ function App() {
               applicantApplications,
               selectedApplicantApplication,
               setSelectedApplicantApplicationId,
+              setActiveSection,
               handleCreateApplication,
               handleUploadDocument,
               handleDeleteDocument,
@@ -1227,6 +1230,8 @@ function renderActiveSection(props) {
       switch (activeSection) {
         case 'applications':
           return <ApplicantApplicationsSection {...props} />;
+        case 'application-create':
+          return <ApplicantApplicationCreateSection {...props} />;
         case 'documents':
           return <ApplicantDocumentsSection {...props} />;
         case 'departments':
@@ -1308,232 +1313,143 @@ function ApplicantProfileSection({ profileForm, setProfileForm, handleSaveProfil
 }
 
 function ApplicantApplicationsSection({
-  applicationForm,
-  setApplicationForm,
-  publicSpecialities,
   applicantApplications,
   selectedApplicantApplication,
   setSelectedApplicantApplicationId,
-  handleCreateApplication,
-  handleUploadDocument,
-  handleDeleteDocument,
-  handleDownloadDocument,
-  documentTypes,
+  setActiveSection,
 }) {
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardContent sx={{ p: 3 }}>
         <SectionHeader
           title="Заявки"
-          text="Создайте новую заявку, посмотрите список и откройте детали выбранной записи."
+          text="Здесь отображается список ваших заявок. Создание заявки вынесено на отдельный экран."
         />
+        <Stack spacing={2}>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Button variant="contained" startIcon={<CloudUpload />} onClick={() => setActiveSection('application-create')}>
+              Создать заявку
+            </Button>
+          </Stack>
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} lg={4}>
-            <Stack component="form" spacing={2} onSubmit={handleCreateApplication}>
-              <TextField
-                select
-                label="Специальность"
-                value={applicationForm.specialityId}
-                onChange={(event) => setApplicationForm({ ...applicationForm, specialityId: event.target.value })}
-                fullWidth
+          <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+            {applicantApplications.map((application) => (
+              <ListItemButton
+                key={application.id}
+                selected={selectedApplicantApplication?.id === application.id}
+                onClick={() => setSelectedApplicantApplicationId(`${application.id}`)}
+                sx={{ alignItems: 'flex-start', py: 1.5 }}
               >
-                <MenuItem value="">Выберите специальность</MenuItem>
-                {publicSpecialities.map((speciality) => (
-                  <MenuItem key={speciality.id} value={speciality.id}>
-                    {speciality.code} · {speciality.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                label="Серия паспорта"
-                value={applicationForm.passportSeries}
-                onChange={(event) => setApplicationForm({ ...applicationForm, passportSeries: event.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="Номер паспорта"
-                value={applicationForm.passportNumber}
-                onChange={(event) => setApplicationForm({ ...applicationForm, passportNumber: event.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="СНИЛС"
-                value={applicationForm.snils}
-                onChange={(event) => setApplicationForm({ ...applicationForm, snils: event.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="Номер аттестата"
-                value={applicationForm.educationDocumentNumber}
-                onChange={(event) => setApplicationForm({ ...applicationForm, educationDocumentNumber: event.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="Школа / колледж"
-                value={applicationForm.graduationSchool}
-                onChange={(event) => setApplicationForm({ ...applicationForm, graduationSchool: event.target.value })}
-                fullWidth
-              />
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Год окончания"
-                    type="number"
-                    value={applicationForm.graduationYear}
-                    onChange={(event) => setApplicationForm({ ...applicationForm, graduationYear: event.target.value })}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Баллы"
-                    type="number"
-                    value={applicationForm.points}
-                    onChange={(event) => setApplicationForm({ ...applicationForm, points: event.target.value })}
-                    fullWidth
-                  />
-                </Grid>
-              </Grid>
-              <TextField
-                label="Комментарий"
-                value={applicationForm.applicantComment}
-                onChange={(event) => setApplicationForm({ ...applicationForm, applicantComment: event.target.value })}
-                multiline
-                minRows={3}
-                fullWidth
-              />
-              <Button type="submit" variant="contained" startIcon={<CloudUpload />} sx={{ alignSelf: 'flex-start' }}>
-                Отправить заявку
-              </Button>
-            </Stack>
-          </Grid>
+                <ListItemText
+                  primary={
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Заявка №{application.id}
+                      </Typography>
+                      <StatusChip status={application.status} />
+                    </Stack>
+                  }
+                  secondary={`${application.speciality.department?.name || 'Без отделения'} · ${application.speciality.code} · ${application.speciality.name}`}
+                />
+              </ListItemButton>
+            ))}
+            {!applicantApplications.length ? (
+              <Box sx={{ p: 2 }}>
+                <EmptyState title="Заявок пока нет" text="Нажмите «Создать заявку», чтобы отправить первое заявление." />
+              </Box>
+            ) : null}
+          </List>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
 
-          <Grid item xs={12} lg={8}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <List dense sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                  {applicantApplications.map((application) => (
-                    <ListItemButton
-                      key={application.id}
-                      selected={selectedApplicantApplication?.id === application.id}
-                      onClick={() => setSelectedApplicantApplicationId(`${application.id}`)}
-                      sx={{ alignItems: 'flex-start', py: 1.5 }}
-                    >
-                      <ListItemText
-                        primary={
-                          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                              {application.speciality.code}
-                            </Typography>
-                            <StatusChip status={application.status} />
-                          </Stack>
-                        }
-                        secondary={application.speciality.name}
-                      />
-                    </ListItemButton>
-                  ))}
-                  {!applicantApplications.length ? (
-                    <Box sx={{ p: 2 }}>
-                      <EmptyState title="Заявок пока нет" text="Создайте первую заявку, чтобы начать работу с приемной комиссией." />
-                    </Box>
-                  ) : null}
-                </List>
-              </Grid>
-
-              <Grid item xs={12} md={8}>
-                {selectedApplicantApplication ? (
-                  <Stack spacing={2.5}>
-                    <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                      <CardContent>
-                        <Stack spacing={2}>
-                          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
-                            <Box>
-                              <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700 }}>
-                                Заявка №{selectedApplicantApplication.id}
-                              </Typography>
-                              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                {selectedApplicantApplication.speciality.name}
-                              </Typography>
-                            </Box>
-                            <StatusChip status={selectedApplicantApplication.status} />
-                          </Stack>
-
-                          <Grid container spacing={2}>
-                            <InfoTile label="Паспорт" value={`${selectedApplicantApplication.passportSeries} ${selectedApplicantApplication.passportNumber}`} />
-                            <InfoTile label="СНИЛС" value={selectedApplicantApplication.snils} />
-                            <InfoTile label="Аттестат" value={selectedApplicantApplication.educationDocumentNumber} />
-                            <InfoTile label="Школа" value={selectedApplicantApplication.graduationSchool} />
-                            <InfoTile label="Баллы" value={selectedApplicantApplication.points} />
-                            <InfoTile label="Комментарий сотрудника" value={selectedApplicantApplication.staffComment || 'Пока нет замечаний'} />
-                          </Grid>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-
-                    <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                      <CardContent>
-                        <SectionHeader title="Документы заявки" text="Файлы, прикрепленные именно к этой заявке." />
-                        <Stack spacing={1.5}>
-                          {selectedApplicantApplication.documents?.map((document) => (
-                            <DocumentRow
-                              key={document.id}
-                              document={document}
-                              onDownload={() => handleDownloadDocument(document.id)}
-                              onDelete={() => handleDeleteDocument(document.id)}
-                            />
-                          ))}
-                          {!selectedApplicantApplication.documents?.length ? (
-                            <EmptyState title="Пока нет документов" text="Здесь появятся прикрепленные файлы." />
-                          ) : null}
-                        </Stack>
-                      </CardContent>
-                    </Card>
-
-                    <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
-                      <CardContent>
-                        <SectionHeader title="Загрузка документа" text="Добавьте файл к выбранной заявке." />
-                        <Box component="form" onSubmit={handleUploadDocument} sx={{ display: 'grid', gap: 2 }}>
-                          <Grid container spacing={2}>
-                            <Grid item xs={12} md={6}>
-                              <TextField select name="type" label="Тип документа" defaultValue={documentTypes[0].value} fullWidth>
-                                {documentTypes.map((item) => (
-                                  <MenuItem key={item.value} value={item.value}>
-                                    {item.label}
-                                  </MenuItem>
-                                ))}
-                              </TextField>
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                              <Button
-                                component="label"
-                                variant="outlined"
-                                startIcon={<CloudUpload />}
-                                sx={{ height: '56px', width: '100%', justifyContent: 'flex-start' }}
-                              >
-                                Выбрать файл
-                                <input name="file" type="file" hidden />
-                              </Button>
-                            </Grid>
-                          </Grid>
-                          <Button type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>
-                            Загрузить
-                          </Button>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Stack>
-                ) : (
-                  <Card variant="outlined" sx={{ borderRadius: 2.5, minHeight: 260 }}>
-                    <CardContent sx={{ p: 3 }}>
-                      <EmptyState title="Нет выбранной заявки" text="Откройте заявку слева, чтобы посмотреть детали." />
-                    </CardContent>
-                  </Card>
-                )}
-              </Grid>
+function ApplicantApplicationCreateSection({ applicationForm, setApplicationForm, publicSpecialities, handleCreateApplication }) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <SectionHeader
+          title="Создание заявки"
+          text="Заполните данные абитуриента и выберите специальность для подачи заявления."
+        />
+        <Stack component="form" spacing={2} onSubmit={handleCreateApplication} sx={{ maxWidth: 760 }}>
+          <TextField
+            select
+            label="Специальность"
+            value={applicationForm.specialityId}
+            onChange={(event) => setApplicationForm({ ...applicationForm, specialityId: event.target.value })}
+            fullWidth
+          >
+            <MenuItem value="">Выберите специальность</MenuItem>
+            {publicSpecialities.map((speciality) => (
+              <MenuItem key={speciality.id} value={speciality.id}>
+                {speciality.department?.name || 'Без отделения'} · {speciality.code} · {speciality.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Серия паспорта"
+            value={applicationForm.passportSeries}
+            onChange={(event) => setApplicationForm({ ...applicationForm, passportSeries: event.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="Номер паспорта"
+            value={applicationForm.passportNumber}
+            onChange={(event) => setApplicationForm({ ...applicationForm, passportNumber: event.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="СНИЛС"
+            value={applicationForm.snils}
+            onChange={(event) => setApplicationForm({ ...applicationForm, snils: event.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="Номер аттестата"
+            value={applicationForm.educationDocumentNumber}
+            onChange={(event) => setApplicationForm({ ...applicationForm, educationDocumentNumber: event.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="Школа / колледж"
+            value={applicationForm.graduationSchool}
+            onChange={(event) => setApplicationForm({ ...applicationForm, graduationSchool: event.target.value })}
+            fullWidth
+          />
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Год окончания"
+                type="number"
+                value={applicationForm.graduationYear}
+                onChange={(event) => setApplicationForm({ ...applicationForm, graduationYear: event.target.value })}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Баллы"
+                type="number"
+                value={applicationForm.points}
+                onChange={(event) => setApplicationForm({ ...applicationForm, points: event.target.value })}
+                fullWidth
+              />
             </Grid>
           </Grid>
-        </Grid>
+          <TextField
+            label="Комментарий"
+            value={applicationForm.applicantComment}
+            onChange={(event) => setApplicationForm({ ...applicationForm, applicantComment: event.target.value })}
+            multiline
+            minRows={3}
+            fullWidth
+          />
+          <Button type="submit" variant="contained" startIcon={<CloudUpload />} sx={{ alignSelf: 'flex-start' }}>
+            Отправить заявку
+          </Button>
+        </Stack>
       </CardContent>
     </Card>
   );
