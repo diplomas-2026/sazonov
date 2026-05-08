@@ -448,18 +448,14 @@ function App() {
         return [
           { value: 'profile', label: 'Профиль', icon: <Person fontSize="small" /> },
           { value: 'applications', label: 'Заявки', icon: <Assignment fontSize="small" /> },
-          { value: 'application-create', label: 'Создание заявки', icon: <CloudUpload fontSize="small" /> },
-          { value: 'documents', label: 'Документы', icon: <Description fontSize="small" /> },
           { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
-          { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
         ];
       case 'STAFF':
         return [
           { value: 'queue', label: 'Очередь', icon: <AssignmentTurnedIn fontSize="small" /> },
           { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
-          { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
         ];
       case 'ADMIN':
         return [
@@ -467,7 +463,6 @@ function App() {
           { value: 'applications', label: 'Заявки', icon: <Assignment fontSize="small" /> },
           { value: 'leaderboard', label: 'Конкурс', icon: <EmojiEvents fontSize="small" /> },
           { value: 'departments', label: 'Отделения', icon: <School fontSize="small" /> },
-          { value: 'specialities', label: 'Специальности', icon: <AssignmentTurnedIn fontSize="small" /> },
           { value: 'users', label: 'Пользователи', icon: <AdminPanelSettings fontSize="small" /> },
         ];
       default:
@@ -486,7 +481,11 @@ function App() {
       return;
     }
 
-    if (activeSection !== 'application-details' && !navigationTabs.some((item) => item.value === activeSection)) {
+    if (
+      activeSection !== 'application-details' &&
+      activeSection !== 'application-create' &&
+      !navigationTabs.some((item) => item.value === activeSection)
+    ) {
       setActiveSection(navigationTabs[0].value);
     }
   }, [auth, navigationTabs, activeSection]);
@@ -1340,51 +1339,41 @@ function renderActiveSection(props) {
     return null;
   }
 
-  switch (auth.user.role) {
-    case 'APPLICANT':
-      switch (activeSection) {
-        case 'applications':
-          return <ApplicantApplicationsSection {...props} />;
-        case 'application-create':
-          return <ApplicantApplicationCreateSection {...props} />;
-        case 'application-details':
-          return <ApplicantApplicationDetailsSection {...props} />;
-        case 'documents':
-          return <ApplicantDocumentsSection {...props} />;
-        case 'leaderboard':
-          return <LeaderboardSection {...props} />;
-        case 'departments':
-          return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
-        case 'specialities':
-          return <SpecialitiesDirectorySection departments={props.publicDepartments} publicSpecialities={props.publicSpecialities} />;
-        case 'profile':
-        default:
-          return <ApplicantProfileSection {...props} />;
+    switch (auth.user.role) {
+      case 'APPLICANT':
+        switch (activeSection) {
+          case 'applications':
+            return <ApplicantApplicationsSection {...props} />;
+          case 'application-create':
+            return <ApplicantApplicationCreateSection {...props} />;
+          case 'application-details':
+            return <ApplicantApplicationDetailsSection {...props} />;
+          case 'leaderboard':
+            return <LeaderboardSection {...props} />;
+          case 'departments':
+            return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
+          case 'profile':
+          default:
+            return <ApplicantProfileSection {...props} />;
+        }
+      case 'STAFF':
+        switch (activeSection) {
+          case 'leaderboard':
+            return <LeaderboardSection {...props} />;
+          case 'queue':
+          default:
+            return <StaffQueueSection {...props} />;
       }
-    case 'STAFF':
-      switch (activeSection) {
-        case 'departments':
-          return <DepartmentDirectorySection departments={props.publicDepartments} specialities={props.publicSpecialities} />;
-        case 'specialities':
-          return <SpecialitiesDirectorySection departments={props.publicDepartments} publicSpecialities={props.publicSpecialities} />;
-        case 'leaderboard':
-          return <LeaderboardSection {...props} />;
-        case 'queue':
-        default:
-          return <StaffQueueSection {...props} />;
-      }
-    case 'ADMIN':
-      switch (activeSection) {
-        case 'applications':
-          return <StaffQueueSection {...props} />;
-        case 'departments':
-          return <AdminDepartmentsSection {...props} />;
-        case 'specialities':
-          return <AdminSpecialitiesSection {...props} />;
-        case 'leaderboard':
-          return <LeaderboardSection {...props} />;
-        case 'users':
-          return <AdminUsersSection {...props} />;
+      case 'ADMIN':
+        switch (activeSection) {
+          case 'applications':
+            return <StaffQueueSection {...props} />;
+          case 'departments':
+            return <AdminDepartmentsSection {...props} />;
+          case 'leaderboard':
+            return <LeaderboardSection {...props} />;
+          case 'users':
+            return <AdminUsersSection {...props} />;
         case 'dashboard':
         default:
           return (
