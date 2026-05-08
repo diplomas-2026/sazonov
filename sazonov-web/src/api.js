@@ -21,7 +21,7 @@ export function clearStoredAuth() {
 async function request(path, { token, method = 'GET', body, isFormData = false } = {}) {
   const headers = {};
   if (token) {
-    headers.Authorization = token;
+    headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
   }
   if (body && !isFormData) {
     headers['Content-Type'] = 'application/json';
@@ -46,7 +46,9 @@ async function request(path, { token, method = 'GET', body, isFormData = false }
 
 async function blobRequest(path, { token } = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: token ? { Authorization: token } : {},
+    headers: token
+      ? { Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}` }
+      : {},
   });
 
   if (!response.ok) {
