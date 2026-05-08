@@ -185,7 +185,6 @@ const emptySpeciality = {
   description: '',
   budgetPlaces: 0,
   paidPlaces: 0,
-  admissionPlan: 0,
 };
 
 const emptyUser = {
@@ -869,7 +868,6 @@ function App() {
           description: saved.description || '',
           budgetPlaces: saved.budgetPlaces,
           paidPlaces: saved.paidPlaces,
-          admissionPlan: saved.admissionPlan,
         });
       }
       setActiveSection('specialities');
@@ -899,7 +897,6 @@ function App() {
           description: first.description || '',
           budgetPlaces: first.budgetPlaces,
           paidPlaces: first.paidPlaces,
-          admissionPlan: first.admissionPlan,
         });
       } else {
         setCreatingSpeciality(false);
@@ -967,7 +964,6 @@ function App() {
       description: speciality.description || '',
       budgetPlaces: speciality.budgetPlaces,
       paidPlaces: speciality.paidPlaces,
-      admissionPlan: speciality.admissionPlan,
     });
     setActiveSection('speciality-form');
   }
@@ -3240,15 +3236,6 @@ function AdminSpecialityFormSection({
                   type="number"
                   value={specialityForm.paidPlaces}
                   onChange={(event) => setSpecialityForm({ ...specialityForm, paidPlaces: event.target.value })}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="План приема"
-                  type="number"
-                  value={specialityForm.admissionPlan}
-                  onChange={(event) => setSpecialityForm({ ...specialityForm, admissionPlan: event.target.value })}
                   fullWidth
                 />
               </Grid>
