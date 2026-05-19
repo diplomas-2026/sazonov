@@ -1,0 +1,7 @@
+digraph single_table {
+  graph [rankdir=TB, fontsize=18];
+  node [shape=plain, fontname="Arial"];
+  label="sazonov — application_documents";
+  labelloc=t;
+  "application_documents" [label=<<TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6"><TR><TD BGCOLOR="#eeeeee" COLSPAN="3"><B>application_documents</B></TD></TR><TR><TD><B>Поле</B></TD><TD><B>Тип</B></TD><TD><B>Модификаторы</B></TD></TR><TR><TD ALIGN="LEFT">id</TD><TD ALIGN="LEFT">bigint(64,0)</TD><TD ALIGN="LEFT">PK, NOT NULL</TD></TR><TR><TD ALIGN="LEFT">application_id</TD><TD ALIGN="LEFT">bigint(64,0)</TD><TD ALIGN="LEFT">NOT NULL, FK → admission_applications.id</TD></TR><TR><TD ALIGN="LEFT">type</TD><TD ALIGN="LEFT">character varying(50)</TD><TD ALIGN="LEFT">NOT NULL</TD></TR><TR><TD ALIGN="LEFT">file_name</TD><TD ALIGN="LEFT">character varying(255)</TD><TD ALIGN="LEFT">NOT NULL</TD></TR><TR><TD ALIGN="LEFT">content_type</TD><TD ALIGN="LEFT">character varying(255)</TD><TD ALIGN="LEFT">NOT NULL</TD></TR><TR><TD ALIGN="LEFT">size</TD><TD ALIGN="LEFT">bigint(64,0)</TD><TD ALIGN="LEFT">NOT NULL</TD></TR><TR><TD ALIGN="LEFT">data</TD><TD ALIGN="LEFT">bytea</TD><TD ALIGN="LEFT">NOT NULL</TD></TR><TR><TD ALIGN="LEFT">uploaded_at</TD><TD ALIGN="LEFT">timestamp with time zone</TD><TD ALIGN="LEFT">NOT NULL</TD></TR></TABLE>>];
+}

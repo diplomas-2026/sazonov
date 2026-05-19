@@ -1,0 +1,7 @@
+digraph single_table {
+  graph [rankdir=TB, fontsize=18];
+  node [shape=plain, fontname="Arial"];
+  label="sazonov — specialities";
+  labelloc=t;
+  "specialities" [label=<<TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6"><TR><TD BGCOLOR="#eeeeee" COLSPAN="3"><B>specialities</B></TD></TR><TR><TD><B>Поле</B></TD><TD><B>Тип</B></TD><TD><B>Модификаторы</B></TD></TR><TR><TD ALIGN="LEFT">id</TD><TD ALIGN="LEFT">bigint(64,0)</TD><TD ALIGN="LEFT">PK, NOT NULL</TD></TR><TR><TD ALIGN="LEFT">code</TD><TD ALIGN="LEFT">character varying(255)</TD><TD ALIGN="LEFT">NOT NULL, UNIQUE</TD></TR><TR><TD ALIGN="LEFT">name</TD><TD ALIGN="LEFT">character varying(255)</TD><TD ALIGN="LEFT">NOT NULL</TD></TR><TR><TD ALIGN="LEFT">description</TD><TD ALIGN="LEFT">character varying(2000)</TD><TD ALIGN="LEFT"></TD></TR><TR><TD ALIGN="LEFT">budget_places</TD><TD ALIGN="LEFT">integer(32,0)</TD><TD ALIGN="LEFT">NOT NULL, DEFAULT 0</TD></TR><TR><TD ALIGN="LEFT">paid_places</TD><TD ALIGN="LEFT">integer(32,0)</TD><TD ALIGN="LEFT">NOT NULL, DEFAULT 0</TD></TR><TR><TD ALIGN="LEFT">admission_plan</TD><TD ALIGN="LEFT">integer(32,0)</TD><TD ALIGN="LEFT">NOT NULL, DEFAULT 0</TD></TR><TR><TD ALIGN="LEFT">created_at</TD><TD ALIGN="LEFT">timestamp with time zone</TD><TD ALIGN="LEFT">NOT NULL</TD></TR><TR><TD ALIGN="LEFT">department_id</TD><TD ALIGN="LEFT">bigint(64,0)</TD><TD ALIGN="LEFT">NOT NULL, FK → departments.id</TD></TR></TABLE>>];
+}
